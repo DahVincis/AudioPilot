@@ -4,22 +4,24 @@ from pythonosc.dispatcher import Dispatcher
 import matplotlib.pyplot as plt
 import numpy as np
 import threading
+import keyboard
 
 # Initialize storage for levels
 chLVL = {18: [], 19: [], 22: []}
+chMapping = {17: 18, 18: 19, 21: 22}  # Mapping of index to channel number
 
 def handle_audio_level(address, *args):
     print(f"Received {address}: {args}")
-    # args[0] will be the blob containing the 4 floats
     if len(args) > 0 and isinstance(args[0], bytes):
-        # Decode the blob assuming it's in the format described: size followed by data
         blob = args[0]
         # The first 4 bytes are the size, but we already know the blob's structure, so we skip this part
         # Directly unpack the 4 float values from the blob
-        values = struct.unpack('>4f', blob[4:20])  # Adjust according to the actual size and content of your blob
+        values = struct.unpack('>4f', blob[4:20])
         print("Decoded values:", values)
-        # Here, you would implement logic to associate these values with the specific channel
-
+        channel_index = args[1]  # This is a placeholder; you need to get the channel index from somewhere.
+        if channel_index in chMapping:
+            channel_id = chMapping[channel_index]
+            chLVL[channel_id].append(values[0])  # Just an example using the first value
 
 # Set up OSC server
 dispatcher = Dispatcher()
@@ -29,6 +31,7 @@ server = ThreadingOSCUDPServer(('0.0.0.0', 10123), dispatcher)
 def update_plot():
     plt.ion()
     fig, ax = plt.subplots()
+    plt.show(block=False)
     while True:
         ax.clear()
         for ch_id, levels in chLVL.items():
@@ -36,7 +39,11 @@ def update_plot():
                 ax.plot(levels, label=f"Channel {ch_id}")
         ax.legend()
         plt.draw()
+        if keyboard.is_pressed('esc'):
+            print("Quitting plot loop.")
+            break
         plt.pause(1)
+    plt.close(fig)
 
 print(f"Serving on {server.server_address}")
 
