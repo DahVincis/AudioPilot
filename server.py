@@ -1,8 +1,9 @@
 import struct
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
-import threading
 import matplotlib.pyplot as plt
+import numpy as np
+import threading
 
 # Initialize storage for levels
 chLVL = {18: [], 19: [], 22: []}
@@ -19,25 +20,29 @@ def handle_audio_level(address, *args):
         print("Decoded values:", values)
         # Here, you would implement logic to associate these values with the specific channel
 
-def plot_levels():
-    plt.ion()
-    while True:
-        plt.clf()
-        for ch_id, levels in chLVL.items():
-            if levels:
-                plt.plot(levels, label=f"Channel {ch_id}")
-        plt.legend()
-        plt.pause(1)  # Update the plot every second
 
 # Set up OSC server
 dispatcher = Dispatcher()
 dispatcher.map("/meters/6", handle_audio_level, needs_reply_address=True)
 server = ThreadingOSCUDPServer(('0.0.0.0', 10123), dispatcher)
+
+def update_plot():
+    plt.ion()
+    fig, ax = plt.subplots()
+    while True:
+        ax.clear()
+        for ch_id, levels in chLVL.items():
+            if levels:
+                ax.plot(levels, label=f"Channel {ch_id}")
+        ax.legend()
+        plt.draw()
+        plt.pause(1)
+
 print(f"Serving on {server.server_address}")
 
-# Start the plotting in a separate thread
-threadPlot = threading.Thread(target=plot_levels)
-threadPlot.start()
+# Start the OSC server in a separate thread
+threadServer = threading.Thread(target=server.serve_forever)
+threadServer.start()
 
-# Start the OSC server
-server.serve_forever()
+# Keep the plotting on the main thread
+update_plot()
