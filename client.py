@@ -17,3 +17,5 @@ client.send_message("/dca/3/on", 1)
 client.send_message("/dca/4/on", 1)
 client.send_message("/dca/5/on", 1)
 client.send_message("/dca/6/on", 1)
+
+client.send_message("ch/19/meters/15", 1)  # Send RTA request
