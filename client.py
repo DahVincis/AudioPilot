@@ -1,4 +1,5 @@
 from pythonosc import udp_client
+import time
 
 X32_IP_ADDRESS = '192.168.56.1'  # IP address of X32 mixer
 X32_OSC_PORT = 10023
@@ -18,4 +19,6 @@ client.send_message("/dca/4/on", 1)
 client.send_message("/dca/5/on", 1)
 client.send_message("/dca/6/on", 1)
 
-client.send_message("ch/19/meters/15", 1)  # Send RTA request
+while True:
+    client.send_message("/xremote", [])
+    time.sleep(7)
