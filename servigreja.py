@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from threading import Thread, Lock
 import time
+import nmap
 
 # Initialize the dispatcher
 dispatcher = Dispatcher()
@@ -68,31 +69,35 @@ def handleRTAData(_, *args):
         # Since we are receiving 100 values, we update dataRTA accordingly
         # This assumes that dataRTA has been appropriately sized to match the 100 frequency bins
         np.copyto(dataRTA[:100], new_data_float)
+    print(f"Received RTA data: {new_data_float[:5]}...")  # Print the first 5 values 
 
 # Map the RTA data handler to the /meters/15 OSC address pattern
 dispatcher.map("/meters/15", handleRTAData)
 
 # Function to set RTA source to channel 19 and then request RTA data
 async def setRTASourceAndRequestData(client):
+    print("Setting RTA source and subscribing to /meters/15")
     # Set the RTA source to channel 19 (value is 20)
     client.send_message("/prefs/rta/source", [20])
     # Wait a bit to ensure the command is processed. This delay might need to be adjusted
     await asyncio.sleep(0.5)
+    client.send_message("/subscribe", ["/meters/15", 1])  # Subscribe to RTA data
     # Now request RTA data
     client.send_message("/meters/15", [])
+    print("Subscription request sent.")
 
 # Correctly schedule setRTASourceAndRequestData within the asyncio event loop
 async def requestRTAData(x32_ip, port):
     client = SimpleUDPClient(x32_ip, port)  # Use the X32's IP address here
     await setRTASourceAndRequestData(client)
 
-async def initServer(local_ip, port):
-    server = AsyncIOOSCUDPServer((local_ip, port), dispatcher, asyncio.get_event_loop())
-    transport, protocol = await server.create_serve_endpoint()
-    return transport
+async def initServer(local_ip, local_port): # Initialize the server
+    server = AsyncIOOSCUDPServer((local_ip, local_port), dispatcher, asyncio.get_event_loop()) # Create the server
+    transport, protocol = await server.create_serve_endpoint() # Create datagram endpoint and start serving
+    return transport # Return the transport object
 
-async def main(local_ip, x32_ip, port):
-    transport = await initServer(local_ip, port)  # Use the local IP for the server
+async def main(local_ip, x32_ip, port, local_port):
+    transport = await initServer(local_ip, local_port)  # Use the local IP for the server
     
     # Schedule the RTA source setting and data request as an asyncio task
     asyncio.create_task(requestRTAData(x32_ip, port))
@@ -102,12 +107,15 @@ async def main(local_ip, x32_ip, port):
 
     try:
         while True:
+            print("Server is running, waiting for OSC messages...")
             await asyncio.sleep(3600)
     except KeyboardInterrupt:
         transport.close()
+        print("Server stopped.")
 
 if __name__ == "__main__":
     local_ip = "127.0.0.1"  # Local server IP address
-    x32_ip = "192.168.0.100"  # X32 mixer IP address
+    local_port = 1337  # Local server port
+    x32_ip = "192.168.0.102"  # X32 mixer IP address
     port = 10023  # OSC port
-    asyncio.run(main(local_ip, x32_ip, port))
+    asyncio.run(main(local_ip, x32_ip, port, local_port))

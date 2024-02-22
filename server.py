@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from threading import Thread, Lock
 import time
+import nmap
 
 # Initialize the dispatcher
 dispatcher = Dispatcher()
@@ -68,46 +69,80 @@ def handleRTAData(_, *args):
         # Since we are receiving 100 values, we update dataRTA accordingly
         # This assumes that dataRTA has been appropriately sized to match the 100 frequency bins
         np.copyto(dataRTA[:100], new_data_float)
+    print(f"Received RTA data: {new_data_float[:5]}...")  # Print the first 5 values 
 
 # Map the RTA data handler to the /meters/15 OSC address pattern
 dispatcher.map("/meters/15", handleRTAData)
 
 # Function to set RTA source to channel 19 and then request RTA data
 async def setRTASourceAndRequestData(client):
+    print("Setting RTA source and subscribing to /meters/15")
     # Set the RTA source to channel 19 (value is 20)
     client.send_message("/prefs/rta/source", [20])
     # Wait a bit to ensure the command is processed. This delay might need to be adjusted
     await asyncio.sleep(0.5)
+    client.send_message("/subscribe", ["/meters/15", 1])  # Subscribe to RTA data
     # Now request RTA data
     client.send_message("/meters/15", [])
+    print("Subscription request sent.")
 
 # Correctly schedule setRTASourceAndRequestData within the asyncio event loop
 async def requestRTAData(x32_ip, port):
     client = SimpleUDPClient(x32_ip, port)  # Use the X32's IP address here
     await setRTASourceAndRequestData(client)
 
-async def initServer(local_ip, port):
-    server = AsyncIOOSCUDPServer((local_ip, port), dispatcher, asyncio.get_event_loop())
-    transport, protocol = await server.create_serve_endpoint()
-    return transport
+async def initServer(local_ip, local_port): # Initialize the server
+    server = AsyncIOOSCUDPServer((local_ip, local_port), dispatcher, asyncio.get_event_loop()) # Create the server
+    transport, protocol = await server.create_serve_endpoint() # Create datagram endpoint and start serving
+    return transport # Return the transport object
 
-async def main(local_ip, x32_ip, port):
-    transport = await initServer(local_ip, port)  # Use the local IP for the server
-    
-    # Schedule the RTA source setting and data request as an asyncio task
-    asyncio.create_task(requestRTAData(x32_ip, port))
+def scan_for_mixers(port='10023', start_subnet=1, end_subnet=100):
+    nm = nmap.PortScanner()
+    mixer_ips = []
+    for third_octet in range(start_subnet, end_subnet + 1):
+        subnet = f'192.168.{third_octet}.0/24'
+        nm.scan(hosts=subnet, arguments=f'-p {port}')
+        for host in nm.all_hosts():
+            if nm[host].has_tcp(int(port)):
+                mixer_ips.append(host)
+                print(f"Found potential X32 mixer at {host}")
+    return mixer_ips
 
-    plotting_thread = Thread(target=plotRTA, daemon=True)
-    plotting_thread.start()
+# Prompt the user to connect to a found mixer
+def prompt_for_connection(mixer_ips):
+    for ip in mixer_ips:
+        response = input(f"Connect to X32 mixer at {ip}? (y/n): ")
+        if response.lower() == 'y':
+            return ip
+    return None
 
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    except KeyboardInterrupt:
-        transport.close()
+# Integration with your existing asyncio-based setup
+async def main():
+    # Automatically detect X32 mixers on the network
+    mixer_ips = scan_for_mixers()
+    if mixer_ips:
+        x32_ip = prompt_for_connection(mixer_ips)
+        if x32_ip:
+            print(f"Connecting to X32 mixer at {x32_ip}...")
+            # Proceed with setting up OSC communication
+            # Your code to set up OSC communication with the mixer goes here
+            # This includes initializing the server, setting the RTA source, subscribing, etc.
+            local_ip = "127.0.0.1"
+            local_port = 1337
+            port = 10023
+            await initServer(local_ip, local_port)
+            asyncio.create_task(requestRTAData(x32_ip, port))
+            plotting_thread = Thread(target=plotRTA, daemon=True)
+            plotting_thread.start()
+            try:
+                while True:
+                    await asyncio.sleep(3600)
+            except KeyboardInterrupt:
+                print("Program terminated by user.")
+        else:
+            print("No mixer was selected for connection.")
+    else:
+        print("No X32 mixers found on the network.")
 
 if __name__ == "__main__":
-    local_ip = "127.0.0.1"  # Local server IP address
-    x32_ip = "192.168.56.1"  # X32 mixer IP address
-    port = 10023  # OSC port
-    asyncio.run(main(local_ip, x32_ip, port))
+    asyncio.run(main())
