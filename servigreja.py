@@ -35,7 +35,7 @@ dataLock = Lock()  # Lock for thread-safe operations on dataRTA
 def plotRTA():
     plt.ion()
     fig, ax = plt.subplots()
-    line, = ax.semilogx(frequencies, dataRTA, 'b-', label='Channel 19 RTA')
+    line, = ax.semilogx(frequencies, dataRTA, 'b-', label='Channel 17 RTA')
     ax.set_ylim(-15, 15)
     ax.set_xlim(20, 20000)
     ax.set_yticks(np.arange(-15, 20, step=5))
@@ -77,13 +77,14 @@ dispatcher.map("/meters/15", handleRTAData)
 # Function to set RTA source to channel 19 and then request RTA data
 async def setRTASourceAndRequestData(client):
     print("Setting RTA source and subscribing to /meters/15")
-    # Set the RTA source to channel 19 (value is 20)
-    client.send_message("/prefs/rta/source", [20])
+    # Set the RTA source to channel 17 (value is 18)
+    client.send_message("/prefs/rta/source", [18])
     # Wait a bit to ensure the command is processed. This delay might need to be adjusted
     await asyncio.sleep(0.5)
     client.send_message("/subscribe", ["/meters/15", 1])  # Subscribe to RTA data
     # Now request RTA data
     client.send_message("/meters/15", [])
+    client.send_message("/xremote", [])
     print("Subscription request sent.")
 
 # Correctly schedule setRTASourceAndRequestData within the asyncio event loop
@@ -116,6 +117,6 @@ async def main(local_ip, x32_ip, port, local_port):
 if __name__ == "__main__":
     local_ip = "127.0.0.1"  # Local server IP address
     local_port = 1337  # Local server port
-    x32_ip = "192.168.0.102"  # X32 mixer IP address
+    x32_ip = "192.168.0.100"  # X32 mixer IP address
     port = 10023  # OSC port
     asyncio.run(main(local_ip, x32_ip, port, local_port))

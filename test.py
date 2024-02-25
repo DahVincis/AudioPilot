@@ -1,18 +1,46 @@
-import nmap
+import asyncio
+from pythonosc.dispatcher import Dispatcher
+from pythonosc.osc_server import AsyncIOOSCUDPServer
+from pythonosc.udp_client import SimpleUDPClient
+import numpy as np
 
-def scan_specific_subnets(port='10023', start_subnet=1, end_subnet=100):
-    nm = nmap.PortScanner()
-    mixer_ips = []
-    for third_octet in range(start_subnet, end_subnet + 1):
-        subnet = f'192.168.{third_octet}.0/24'
-        print(f"Scanning subnet: {subnet}")
-        nm.scan(hosts=subnet, arguments=f'-p {port}')
-        for host in nm.all_hosts():
-            if nm[host].has_tcp(int(port)):
-                mixer_ips.append(host)
-                print(f"Found device with open port {port} at {host}")
-    return mixer_ips
+# Initialize the dispatcher
+dispatcher = Dispatcher()
 
-# Example usage
-mixer_ips = scan_specific_subnets()
-print("Found potential X32 mixers at:", mixer_ips)
+# Function to print received RTA data
+def handleRTAData(_, *args):
+    osc_blob = args[0]  # Assuming the first argument is the blob data
+    # Assuming the blob data format is known and matches the expected RTA data format
+    data = np.frombuffer(osc_blob, dtype='<i2')
+    db_levels = data.astype(np.float32) / 256.0
+    print("Received RTA dB levels:", db_levels)
+
+# Setup dispatcher to handle RTA data
+dispatcher.map("/meters/15", handleRTAData)
+
+async def keep_xremote_active(client):
+    while True:
+        client.send_message("/xremote", [])
+        await asyncio.sleep(9)  # Send every 9 seconds to keep the connection alive
+
+async def main(ip, port):
+    client = SimpleUDPClient(ip, port)
+    server = AsyncIOOSCUDPServer(("0.0.0.0", 10024), dispatcher, asyncio.get_event_loop())
+    transport, protocol = await server.create_serve_endpoint()  # Start the OSC server
+
+    # Start the background task to keep XRemote active
+    asyncio.create_task(keep_xremote_active(client))
+
+    print("OSC Server is running. Waiting for RTA data...")
+
+    try:
+        while True:
+            await asyncio.sleep(1)  # Keep the script running
+    except KeyboardInterrupt:
+        transport.close()
+        print("Script stopped by user.")
+
+if __name__ == "__main__":
+    ip = "192.168.0.100"  # X32 mixer IP address
+    port = 10023  # OSC port used by the X32 mixer
+    asyncio.run(main(ip, port))
