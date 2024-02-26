@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from threading import Thread, Lock
 import time
-import nmap
 
 # Initialize the dispatcher
 dispatcher = Dispatcher()
@@ -117,6 +116,6 @@ async def main(local_ip, x32_ip, port, local_port):
 if __name__ == "__main__":
     local_ip = "127.0.0.1"  # Local server IP address
     local_port = 1337  # Local server port
-    x32_ip = "192.168.0.100"  # X32 mixer IP address
+    x32_ip = "192.168.56.1"  # X32 mixer IP address
     port = 10023  # OSC port
     asyncio.run(main(local_ip, x32_ip, port, local_port))

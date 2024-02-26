@@ -13,7 +13,7 @@ import socket
 import threading
 
 last_recv_addr = None
-behringer_addr = '198.168.0.100'
+behringer_addr = '198.168.56.1'
 client = udp_client.SimpleUDPClient(behringer_addr, 10023)
 
 def keep_behringer_awake():

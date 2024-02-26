@@ -5,7 +5,7 @@ from pythonosc.udp_client import SimpleUDPClient
 import numpy as np
 
 # IP and port configuration
-MIXER_IP = '192.168.0.100'  # Replace with the IP address of your X32 mixer
+MIXER_IP = '192.168.56.1'  # Replace with the IP address of your X32 mixer
 MIXER_PORT = 10023          # Port on which the X32 OSC server is running
 LOCAL_IP = '0.0.0.0'        # Listen on all local IPs
 LOCAL_PORT = 10024          # Port on which this script's OSC server will listen

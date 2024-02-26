@@ -41,6 +41,6 @@ async def main(ip, port):
         print("Script stopped by user.")
 
 if __name__ == "__main__":
-    ip = "192.168.0.100"  # X32 mixer IP address
+    ip = "192.168.56.1"  # X32 mixer IP address
     port = 10023  # OSC port used by the X32 mixer
     asyncio.run(main(ip, port))
