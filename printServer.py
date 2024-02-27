@@ -15,6 +15,7 @@ dispatcher = Dispatcher()
 
 # Function to handle RTA data for channel 19
 def handle_rta_data(address, *args):
+    print("Got data!", args)
     osc_blob = args[0]
     # Assuming the blob data is little-endian 16-bit integers
     new_data = np.frombuffer(osc_blob, dtype='<i2').reshape(-1)

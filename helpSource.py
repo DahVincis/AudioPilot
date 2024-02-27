@@ -31,31 +31,31 @@ def keep_behringer_awake():
     time.sleep(5)
 
 class MyDispatcher(dispatcher.Dispatcher):
-    def call_handlers_for_packet(self, data: bytes, client_address: Tuple[str, int]) -> None:
-        # ugly. Needs refactoring
-        global last_recv_addr
-        global behringer_addr
-        # Get OSC messages from all bundles or standalone message.
-        try:
-            # Loop prevention
-            if client_address[0] != behringer_addr:
-              client._sock.sendto(data, (behringer_addr, 10023))
-              last_recv_addr = client_address
-            if last_recv_addr is not None:
-              client._sock.sendto(data, last_recv_addr)
-            packet = osc_packet.OscPacket(data)
-            for timed_msg in packet.messages:
-              now = time.time()
-              handlers = self.handlers_for_address(timed_msg.message.address)
-              if not handlers:
-                continue
-                # If the message is to be handled later, then so be it.
-              if timed_msg.time > now:
-                time.sleep(timed_msg.time - now)
-                for handler in handlers:
-                  handler.invoke(client_address, timed_msg.message)
-        except osc_packet.ParseError:
-            pass
+  def call_handlers_for_packet(self, data: bytes, client_address: Tuple[str, int]) -> None:
+    # ugly. Needs refactoring
+    global last_recv_addr
+    global behringer_addr
+    # Get OSC messages from all bundles or standalone message.
+    try:
+      # Loop prevention
+      if client_address[0] != behringer_addr:
+        client._sock.sendto(data, (behringer_addr, 10023))
+        last_recv_addr = client_address
+      if last_recv_addr is not None:
+        client._sock.sendto(data, last_recv_addr)
+      packet = osc_packet.OscPacket(data)
+      for timed_msg in packet.messages:
+        now = time.time()
+        handlers = self.handlers_for_address(timed_msg.message.address)
+        if not handlers:
+          continue
+          # If the message is to be handled later, then so be it.
+        if timed_msg.time > now:
+          time.sleep(timed_msg.time - now)
+          for handler in handlers:
+            handler.invoke(client_address, timed_msg.message)
+    except osc_packet.ParseError:
+      pass
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
