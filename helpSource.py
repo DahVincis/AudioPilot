@@ -27,7 +27,6 @@ def keep_behringer_awake():
     client.send_message('/mtx/02/mix/on', None)
     client.send_message('/main/st/mix/on', None)
     client.send_message('/main/st/mix/fader', None)
-    client.send_message("/meters/15", [])
     time.sleep(5)
 
 class MyDispatcher(dispatcher.Dispatcher):
