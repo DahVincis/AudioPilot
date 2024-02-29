@@ -19,7 +19,7 @@ def linear_to_db(linear_value):
     if linear_value <= 0:
         return "-inf"
     else:
-        min_db = -90  # Assuming -90 dB to 0 dB mapping for 0.0 to 1.0 linear scale.
+        min_db = -90
         max_db = 0
         range_db = max_db - min_db
         return min_db + (math.log10(linear_value) / math.log10(1.0)) * range_db
@@ -34,11 +34,17 @@ def keep_behringer_awake():
         client.send_message('/mtx/01/mix/on', None)
         time.sleep(5)
 
+def subscribe_and_renew_rta():
+    """Subscribes to RTA data and periodically renews the subscription."""
+    client.send_message("/batchsubscribe", ["/meters/15", 0, 0, 1])
+    while True:
+        time.sleep(9)  # Renew just before the 10-second timeout
+        client.send_message("/renew", ["/meters/15"])
+
 def process_rta_data(args):
     """Processes RTA data received from the X32."""
-    rta_blob = args[0]  # RTA data is expected to be the first argument
-    # Decode the blob into 100 short ints (50 32-bit values representing 100 short ints)
-    short_ints = struct.unpack('<100h', rta_blob)  # Little-endian format
+    rta_blob = args[0]
+    short_ints = struct.unpack('<100h', rta_blob)
     db_values = [short_int / 256.0 for short_int in short_ints]
     for i, db_value in enumerate(db_values):
         logging.info(f"RTA Frequency Band {i+1}: {db_value} dB")
@@ -70,9 +76,8 @@ if __name__ == "__main__":
     keep_alive_thread = threading.Thread(target=keep_behringer_awake, daemon=True)
     keep_alive_thread.start()
 
-    # Subscribe to RTA data
-    subscribe_to_rta_thread = threading.Thread(target=lambda: 
-        client.send_message("/meters/subscribe", ["/meters/15", 1]), daemon=True)
-    subscribe_to_rta_thread.start()
+    # Start the RTA subscription and renewal in a separate thread
+    rta_subscription_thread = threading.Thread(target=subscribe_and_renew_rta, daemon=True)
+    rta_subscription_thread.start()
 
     server.serve_forever()
