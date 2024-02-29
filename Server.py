@@ -11,18 +11,15 @@ import struct
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-behringer_addr = '26.11.225.132'
+behringer_addr = '192.168.56.1'
 client = SimpleUDPClient(behringer_addr, 10023)
 
 def linear_to_db(linear_value):
     """Converts a linear fader value to dB."""
-    if linear_value <= 0:
+    if linear_value <= 1e-10:  # Threshold for silence to avoid log(0)
         return "-inf"
     else:
-        min_db = -90
-        max_db = 0
-        range_db = max_db - min_db
-        return min_db + (math.log10(linear_value) / math.log10(1.0)) * range_db
+        return 20 * math.log10(linear_value)
 
 def keep_behringer_awake():
     """Sends keep-alive messages to Behringer."""
@@ -31,7 +28,6 @@ def keep_behringer_awake():
         client.send_message('/xremote', None)
         client.send_message('/mtx/02/mix/fader', None)
         client.send_message('/mtx/01/mix/fader', None)
-        client.send_message('/mtx/01/mix/on', None)
         time.sleep(5)
 
 def subscribe_and_renew_rta():
