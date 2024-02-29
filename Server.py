@@ -36,10 +36,10 @@ def keep_behringer_awake():
 
 def subscribe_and_renew_rta():
     """Subscribes to RTA data and periodically renews the subscription."""
-    client.send_message("/batchsubscribe", ["/meters/15", 0, 0, 1])
+    client.send_message("/batchsubscribe", ["meters/15", "/meters/15", 0, 0, 1])
     while True:
         time.sleep(9)  # Renew just before the 10-second timeout
-        client.send_message("/renew", ["/meters/15"])
+        client.send_message("/renew", ["meters/15"])
 
 def process_rta_data(args):
     """Processes RTA data received from the X32."""
