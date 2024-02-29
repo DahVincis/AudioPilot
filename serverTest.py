@@ -11,7 +11,7 @@ from typing import overload, List, Union, Any, Generator, Tuple
 from types import FunctionType
 
 last_recv_addr = None
-behringer_addr = '198.168.56.1'
+behringer_addr = '198.168.0.100'
 client = SimpleUDPClient(behringer_addr, 10023)
 
 def keep_behringer_awake():
@@ -33,26 +33,6 @@ def keep_behringer_awake():
 
 class MyDispatcher(Dispatcher):
     def call_handlers_for_packet(self, data: bytes, client_address: Tuple[str, int]) -> None:
-        try:
-        # Loop prevention
-            if client_address[0] != behringer_addr:
-                client._sock.sendto(data, (behringer_addr, 10023))
-                last_recv_addr = client_address
-            if last_recv_addr is not None:
-                client._sock.sendto(data, last_recv_addr)
-            packet = osc_packet.OscPacket(data)
-            for timed_msg in packet.messages:
-                now = time.time()
-                handlers = self.handlers_for_address(timed_msg.message.address)
-                if not handlers:
-                    continue
-                # If the message is to be handled later, then so be it.
-                if timed_msg.time > now:
-                    time.sleep(timed_msg.time - now)
-                for handler in handlers:
-                    handler.invoke(client_address, timed_msg.message)
-        except osc_packet.ParseError:
-            pass
         print("Handler working...", data, client_address)
         pass
 
@@ -61,7 +41,7 @@ if __name__ == "__main__":
   parser.add_argument("--ip",
       default="0.0.0.0", help="The ip to listen on")
   parser.add_argument("--port",
-      type=int, default=10024, help="The port to listen on")
+      type=int, default=10023, help="The port to listen on")
   args = parser.parse_args()
 
   dispatcher = MyDispatcher()
