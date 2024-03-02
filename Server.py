@@ -11,7 +11,7 @@ import struct
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-behringer_addr = '192.168.56.1'
+behringer_addr = '192.168.0.100'
 client = SimpleUDPClient(behringer_addr, 10023)
 
 def linear_to_db(linear_value):
@@ -47,14 +47,11 @@ def process_rta_data(args):
 
 def default_handler(address, *args):
     """Default handler for all messages."""
-    if "/mix/fader" in address:
-        linear_value = args[0]
-        db_value = linear_to_db(linear_value)
-        logging.info(f"Received fader message on {address}. Linear: {linear_value}, in dB: {db_value}")
-    elif address == "/meters/15":
-        process_rta_data(args)
-    else:
-        logging.info(f"Received message on {address} with args: {args}")
+    linear_value = args[0]
+    db_value = linear_to_db(linear_value)
+    logging.info(f"Received fader message on {address}. Linear: {linear_value}, in dB: {db_value}")
+    process_rta_data(args)
+    logging.info(f"Received message on {address} with args: {args}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
