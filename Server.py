@@ -30,7 +30,7 @@ def keep_behringer_awake():
 def subscribe_and_renew_rta():
     """Subscribes to RTA data and periodically renews the subscription."""
     logging.debug("Subscribing to meters/15")
-    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 1])
+    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 80]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
     logging.debug("Subscription message sent")
     while True:
         time.sleep(9)  # Renew just before the 10-second timeout
@@ -45,34 +45,35 @@ def process_rta_data(address, *args):
 
     rta_blob = args[0]
     print(f"RTA blob size: {len(rta_blob)}")
-    print(f"RTA blob content: {rta_blob.hex()}")  # This will print the blob as hexadecimal
+    print(f"RTA blob content: {rta_blob.hex()}")
 
-    data_points = len(rta_blob) // 4  # Calculate how many 32-bit integers are present
+    # Calculate the number of 32-bit integers (4 bytes each) in the blob
+    data_points = len(rta_blob) // 4
     print(f"Number of data points: {data_points}")
 
     try:
-        # Adjust unpacking to handle the actual number of data points
+        # Dynamically unpack the blob based on its actual size
         ints = struct.unpack(f'<{data_points}I', rta_blob)
-        # Process each 32-bit integer into two short integers and convert to dB
         db_values = []
         for int_value in ints:
-            # Mask and shift to get the two short integers from the 32-bit integer
+            # Process each 32-bit integer into two short integers and convert to dB
             short_int1 = int_value & 0xFFFF
             short_int2 = (int_value >> 16) & 0xFFFF
-            # Convert short integers to signed values
-            if short_int1 >= 0x8000:
-                short_int1 -= 0x10000
-            if short_int2 >= 0x8000:
-                short_int2 -= 0x10000
-            # Calculate dB values
+            # Adjusting for signed values
+            if short_int1 >= 0x8000: short_int1 -= 0x10000
+            if short_int2 >= 0x8000: short_int2 -= 0x10000
+            # Convert to dB values
             db_value1 = short_int1 / 256.0
             db_value2 = short_int2 / 256.0
-            db_values.extend([db_value1, db_value2])
+            db_values.append(db_value1)
+            db_values.append(db_value2)
 
-        for i, db_value in enumerate(db_values):
+        # Print the dB values for the RTA frequency bands
+        for i, db_value in enumerate(db_values[:100]):  # Limiting to first 100 values if more are present
             print(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
+
 
 # data points from mixer to convert to dB
 fader_positions = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
