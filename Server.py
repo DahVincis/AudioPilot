@@ -30,12 +30,12 @@ def keep_behringer_awake():
 def subscribe_and_renew_rta():
     """Subscribes to RTA data and periodically renews the subscription."""
     logging.debug("Subscribing to meters/15")
-    client.send_message("/batchsubscribe", ["meters/15", "/meters/15", 0, 0, 1])
+    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 1])
     logging.debug("Subscription message sent")
     while True:
         time.sleep(9)  # Renew just before the 10-second timeout
         logging.debug("Renewing subscription to meters/15")
-        client.send_message("/renew", ["meters/15"])
+        client.send_message("/renew", [""])
 
 def process_rta_data(address, *args):
     print(f"Entered process_rta_data with address: {address} and args: {args}")
@@ -47,14 +47,12 @@ def process_rta_data(address, *args):
     print(f"RTA blob size: {len(rta_blob)}")
     print(f"RTA blob content: {rta_blob.hex()}")  # This will print the blob as hexadecimal
 
-    expected_length = 50 * 4  # 50 32-bit integers, each 4 bytes
-    if len(rta_blob) != expected_length:
-        logging.error(f"On {address} Unexpected RTA blob length: {len(rta_blob)}. Expected {expected_length}.")
-        return
+    data_points = len(rta_blob) // 4  # Calculate how many 32-bit integers are present
+    print(f"Number of data points: {data_points}")
 
     try:
-        # Unpack the blob into 50 32-bit integers
-        ints = struct.unpack('<50I', rta_blob)
+        # Adjust unpacking to handle the actual number of data points
+        ints = struct.unpack(f'<{data_points}I', rta_blob)
         # Process each 32-bit integer into two short integers and convert to dB
         db_values = []
         for int_value in ints:
@@ -102,7 +100,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     dispatcher = Dispatcher()
-    dispatcher.map("meters/15", process_rta_data)
+    dispatcher.map("/meters", process_rta_data)
     dispatcher.map("/*/*/mix/fader", print_fader_handler)
     dispatcher.set_default_handler(default_handler)
 
