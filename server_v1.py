@@ -69,7 +69,7 @@ def process_rta_data(address, *args):
             db_values.append(db_value2)
 
         # Print the dB values for the RTA frequency bands
-        for i, db_value in enumerate(db_values[:100]):  # Limiting to first 100 values if more are present
+        for i, db_value in enumerate(db_values):
             print(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
