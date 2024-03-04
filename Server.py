@@ -5,7 +5,6 @@ import argparse
 import time
 import threading
 import logging
-import math
 import struct
 from numpy.polynomial.polynomial import Polynomial
 import numpy as np
@@ -30,39 +29,54 @@ def keep_behringer_awake():
 
 def subscribe_and_renew_rta():
     """Subscribes to RTA data and periodically renews the subscription."""
+    logging.debug("Subscribing to meters/15")
     client.send_message("/batchsubscribe", ["meters/15", "/meters/15", 0, 0, 1])
+    logging.debug("Subscription message sent")
     while True:
         time.sleep(9)  # Renew just before the 10-second timeout
+        logging.debug("Renewing subscription to meters/15")
         client.send_message("/renew", ["meters/15"])
 
 def process_rta_data(address, *args):
-    """Processes RTA data received from the X32."""
-    # Ensure there's at least one argument (the rta_blob)
+    print(f"Entered process_rta_data with address: {address} and args: {args}")
     if not args:
         logging.error(f"No RTA data received on {address}")
         return
 
-    # The rta_blob is expected to be the first argument
     rta_blob = args[0]
+    print(f"RTA blob size: {len(rta_blob)}")
+    print(f"RTA blob content: {rta_blob.hex()}")  # This will print the blob as hexadecimal
 
-    # Ensure the rta_blob is of the expected length to avoid unpacking errors
-    expected_length = 100 * 2  # 100 short integers, each 2 bytes
+    expected_length = 50 * 4  # 50 32-bit integers, each 4 bytes
     if len(rta_blob) != expected_length:
         logging.error(f"On {address} Unexpected RTA blob length: {len(rta_blob)}. Expected {expected_length}.")
         return
 
     try:
-        # Unpack the blob into 100 short integers
-        short_ints = struct.unpack('<100h', rta_blob)
-        # Convert to dB values (example conversion, adjust as necessary)
-        db_values = [short_int / 256.0 for short_int in short_ints]
-        for i, db_value in enumerate(db_values):
-            logging.info(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
-    except struct.error as e:
-        logging.error(f"{address} ~ Error unpacking RTA data: {e}")
+        # Unpack the blob into 50 32-bit integers
+        ints = struct.unpack('<50I', rta_blob)
+        # Process each 32-bit integer into two short integers and convert to dB
+        db_values = []
+        for int_value in ints:
+            # Mask and shift to get the two short integers from the 32-bit integer
+            short_int1 = int_value & 0xFFFF
+            short_int2 = (int_value >> 16) & 0xFFFF
+            # Convert short integers to signed values
+            if short_int1 >= 0x8000:
+                short_int1 -= 0x10000
+            if short_int2 >= 0x8000:
+                short_int2 -= 0x10000
+            # Calculate dB values
+            db_value1 = short_int1 / 256.0
+            db_value2 = short_int2 / 256.0
+            db_values.extend([db_value1, db_value2])
 
-# Example calibration data points for a channel
-# Replace these with your actual measured data points
+        for i, db_value in enumerate(db_values):
+            print(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
+    except Exception as e:
+        logging.error(f"Error processing RTA data: {e}")
+
+# data points from mixer to convert to dB
 fader_positions = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
 db_values = np.array([-90.0, -30.0, -10.0, 0.0, 10.0])
 
