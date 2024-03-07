@@ -9,10 +9,6 @@ import struct
 from numpy.polynomial.polynomial import Polynomial
 import numpy as np
 import matplotlib.pyplot as plt
-from queue import Queue
-
-# Initialize a queue for thread-safe RTA data updates
-rta_data_queue = Queue()
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -20,7 +16,7 @@ logging.basicConfig(level=logging.DEBUG)
 X32_IP = '192.168.0.101'
 client = SimpleUDPClient(X32_IP, 10023)
 
-# Hardcoded frequencies as per the documentation
+# Hardcoded frequencies based on documentation
 frequencies = np.array([
     20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
     39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
@@ -34,27 +30,15 @@ frequencies = np.array([
     10.0e3, 10.72e3, 11.49e3, 12.31e3, 13.20e3, 14.14e3, 15.16e3, 16.25e3, 17.41e3, 18.66e3
 ])
 
-# Initialize plotting
+
+# Initialize plotting (This might be moved or called differently based on your plotting strategy)
 plt.ion()
 fig, ax = plt.subplots()
 ax.set_xscale('log')
 ax.set_xlim(20, 20000)
 ax.set_ylim(-60, 10)
-line, = ax.plot(frequencies, np.zeros_like(frequencies), 'r-')  # Use the provided frequencies array
-ax.set_xlabel('Frequency (Hz)')
-ax.set_ylabel('Level (dB)')
-ax.set_title('RTA Visualization')
+line, = ax.plot(frequencies, np.zeros_like(frequencies), 'r-')  # Initial plot
 plt.show(block=False)
-
-def plot_rta_data():
-    global line, ax
-    while True:
-        db_values = rta_data_queue.get()  # Wait for new RTA dB values to become available
-        line.set_ydata(db_values)  # Update the plot with new RTA dB values
-        ax.relim()  # Recompute the ax.dataLim
-        ax.autoscale_view()  # Update ax.viewLim using the new dataLim
-        plt.draw()
-        plt.pause(0.01)  # Pause briefly to allow the plot to be updated
 
 def keep_behringer_awake():
     """Sends keep-alive messages to Behringer."""
@@ -79,6 +63,8 @@ def subscribe_and_renew_rta():
         client.send_message("/renew", [""])
 
 def process_rta_data(address, *args):
+    global line, ax  # These are needed if you're updating the plot objects
+
     print(f"Entered process_rta_data with address: {address} and args: {args}")
     if not args:
         logging.error(f"No RTA data received on {address}")
@@ -109,7 +95,20 @@ def process_rta_data(address, *args):
         
         # Ensure db_values length matches frequencies length for plotting
         db_values = db_values[:len(frequencies)]
-        rta_data_queue.put(db_values)  # Push the new RTA dB values to the queue for plotting
+        
+        # Update the plot
+        ax.clear()  # Clear the plot for new data
+        ax.set_xscale('log')
+        ax.set_xlim(20, 20000)
+        ax.set_ylim(-60, 10)
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Level (dB)')
+        ax.set_title('RTA Visualization')
+        
+        # Plot the new data
+        line, = ax.plot(frequencies, db_values, 'r-')  # Recreate the plot with updated data
+        plt.draw()
+        plt.pause(0.1)  # Allows the GUI to update
 
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
@@ -154,9 +153,5 @@ if __name__ == "__main__":
     # Start the RTA subscription and renewal in a separate thread
     rta_subscription_thread = threading.Thread(target=subscribe_and_renew_rta, daemon=True)
     rta_subscription_thread.start()
-
-    # Start the plotting thread
-    plotting_thread = threading.Thread(target=plot_rta_data, daemon=True)
-    plotting_thread.start()
 
     server.serve_forever()

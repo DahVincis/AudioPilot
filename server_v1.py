@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.DEBUG)
 X32_IP = '192.168.56.1'
 client = SimpleUDPClient(X32_IP, 10023)
 
+# keep mixer awake by sending xremote and messages to be received
 def keep_behringer_awake():
     """Sends keep-alive messages to Behringer."""
     while True:
@@ -27,6 +28,7 @@ def keep_behringer_awake():
         client.send_message('/ch/29/mix/fader', None)
         time.sleep(3)
 
+# subscribtion and renewal of RTA data (/meters/15)
 def subscribe_and_renew_rta():
     """Subscribes to RTA data and periodically renews the subscription."""
     logging.debug("Subscribing to meters/15")
@@ -37,6 +39,7 @@ def subscribe_and_renew_rta():
         logging.debug("Renewing subscription to meters/15")
         client.send_message("/renew", [""])
 
+# grabs rta data to process into dB values (102 data points)
 def process_rta_data(address, *args):
     print(f"Entered process_rta_data with address: {address} and args: {args}")
     if not args:
@@ -75,13 +78,14 @@ def process_rta_data(address, *args):
         logging.error(f"Error processing RTA data: {e}")
 
 
-# data points from mixer to convert to dB
+# data points from mixer to convert to dB (fader)
 fader_positions = np.array([0.0000, 0.2502, 0.5005, 0.6256, 0.6999, 0.7478, 0.8250, 0.9003, 0.9501, 1.0000])
 db_values = np.array([-90.0, -30.0, -10.0, -5.0, -2.0, 0.0, 3.0, 6.0, 8.0, 10.0])
 
-# Fit a polynomial to the data points
+# fit a polynomial to the data points
 p = Polynomial.fit(fader_positions, db_values, deg=4)
 
+# handler for converting to dB and printing all fader type data
 def print_fader_handler(address, *args):
     if args and isinstance(args[0], float):
         float_value = args[0]
@@ -90,9 +94,11 @@ def print_fader_handler(address, *args):
     else:
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
 
+# if message received does not have a mapped handler, use default
 def default_handler(address, *args):
     """Default handler for all messages."""
     logging.info(f"Received fader message on {address}. Args: {args}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -112,7 +118,7 @@ if __name__ == "__main__":
     keep_alive_thread = threading.Thread(target=keep_behringer_awake, daemon=True)
     keep_alive_thread.start()
 
-    # Start the RTA subscription and renewal in a separate thread
+    # start the RTA subscription and renewal in a separate thread
     rta_subscription_thread = threading.Thread(target=subscribe_and_renew_rta, daemon=True)
     rta_subscription_thread.start()
 
