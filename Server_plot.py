@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32_IP = '192.168.0.101'
+X32_IP = '192.168.1.21'
 client = SimpleUDPClient(X32_IP, 10023)
 
 # Hardcoded frequencies based on documentation

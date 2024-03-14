@@ -12,7 +12,7 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32_IP = '192.168.56.1'
+X32_IP = '192.168.1.21'
 client = SimpleUDPClient(X32_IP, 10023)
 
 # keep mixer awake by sending xremote and messages to be received
