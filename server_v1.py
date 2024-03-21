@@ -12,12 +12,11 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32IP = '192.168.1.22'
+X32IP = '192.168.1.24'
 client = SimpleUDPClient(X32IP, 10023)
 
 # keep mixer awake by sending xremote and messages to be received
 def keepMixerAwake():
-    """Sends keep-alive messages to Behringer."""
     while True:
         logging.debug("Sending keep-alive messages to Behringer")
         client.send_message('/xremote', None)
@@ -30,7 +29,6 @@ def keepMixerAwake():
 
 # subscribtion and renewal of RTA data (/meters/15)
 def subRenewRTA():
-    """Subscribes to RTA data and periodically renews the subscription."""
     logging.debug("Subscribing to meters/15")
     client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 80]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
     logging.debug("Subscription message sent")
@@ -72,8 +70,8 @@ def handlerRTA(address, *args):
             dbValues.append(dbValue2)
 
         # Print the dB values for the RTA frequency bands
-        for i, db_value in enumerate(dbValues):
-            print(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
+        for i, dbValue in enumerate(dbValues):
+            print(f"{address} ~ RTA Frequency Band {i+1}: {dbValue} dB")
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
 
@@ -96,9 +94,7 @@ def handlerFader(address, *args):
 
 # if message received does not have a mapped handler, use default
 def handlerDefault(address, *args):
-    """Default handler for all messages."""
     logging.info(f"Received fader message on {address}. Args: {args}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
