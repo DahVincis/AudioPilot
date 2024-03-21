@@ -13,8 +13,26 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32_IP = '192.168.1.22'
+X32_IP = '192.168.1.24'
 client = SimpleUDPClient(X32_IP, 10023)
+
+# Initialize CSV files with headers outside of the functions
+def initialize_csv_files():
+    with open(args_data_csv_file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Address', 'Args'])
+    
+    with open(db_values_csv_file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Address', 'Fader', 'dB Value'])
+    
+    with open(rta_db_values_csv_file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Frequency Band', 'dB Value'])
+
+args_data_csv_file_path = 'args_data.csv'
+db_values_csv_file_path = 'db_values.csv'
+rta_db_values_csv_file_path = 'rta_db_values.csv'
 
 # keep mixer awake by sending xremote and messages to be received
 def keep_behringer_awake():
@@ -75,17 +93,19 @@ def process_rta_data(address, *args):
         # Print the dB values for the RTA frequency bands
         for i, db_value in enumerate(db_values):
             print(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
+        with open(rta_db_values_csv_file_path, 'a', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            for i, db_value in enumerate(db_values):
+                csvwriter.writerow([f'Band {i+1}', db_value])
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
 
     # Save args to CSV file
-    with open('rta_args_data.csv', 'a', newline='') as csvfile:
+    with open(rta_db_values_csv_file_path, 'a', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
         # Convert args to string for easy CSV writing, or handle individually
         args_str = ', '.join(str(arg) for arg in args)
         csvwriter.writerow([address, args_str])
-
-
 
 # data points from mixer to convert to dB (fader)
 fader_positions = np.array([0.0000, 0.2502, 0.5005, 0.6256, 0.6999, 0.7478, 0.8250, 0.9003, 0.9501, 1.0000])
@@ -130,6 +150,7 @@ with open(db_values_csv_file_path, mode='w', newline='') as file:
     writer.writerow(['Address', 'Frequency Band', 'dB Value'])
 
 if __name__ == "__main__":
+    initialize_csv_files()
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", default="0.0.0.0", help="The ip to listen on")
     parser.add_argument("--port", type=int, default=10024, help="The port to listen on")
