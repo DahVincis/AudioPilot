@@ -83,9 +83,9 @@ def handlerRTA(address, *args):
             dbValues.append(dbValue2)
 
         # Print the dB values for the RTA frequency bands
-        for i, db_value in enumerate(db_values):
-            frequency_label = frequencies[i] if i < len(frequencies) else "Unknown"
-            print(f"{address} ~ RTA Frequency {frequency_label}Hz: {db_value} dB")
+        for i, dbValue in enumerate(dbValues):
+            freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
+            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
 
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
