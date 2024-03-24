@@ -20,17 +20,17 @@ def keepMixerAwake():
     while True:
         logging.debug("Sending keep-alive messages to Behringer")
         client.send_message('/xremote', None)
-        client.send_message('/ch/18/mix/fader', None)
-        client.send_message('/ch/19/mix/fader', None)
-        client.send_message('/ch/20/mix/fader', None)
-        client.send_message('/ch/22/mix/fader', None)
-        client.send_message('/ch/29/mix/fader', None)
+        client.send_message('/ch/04/mix/fader', None)
+        client.send_message('/ch/05/mix/fader', None)
+        client.send_message('/ch/06/mix/fader', None)
+        client.send_message('/ch/07/mix/fader', None)
+        client.send_message('/ch/08/mix/fader', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
 def subRenewRTA():
     logging.debug("Subscribing to meters/15")
-    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 80]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
+    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 40]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
     logging.debug("Subscription message sent")
     while True:
         time.sleep(9)  # Renew just before the 10-second timeout
@@ -39,7 +39,7 @@ def subRenewRTA():
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
-    print(f"Entered process_rta_data with address: {address} and args: {args}")
+    print(f"Entered handlerRTA with address: {address} and args: {args}")
     if not args:
         logging.error(f"No RTA data received on {address}")
         return

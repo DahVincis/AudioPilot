@@ -51,7 +51,7 @@ def keep_behringer_awake():
 def subscribe_and_renew_rta():
     """Subscribes to RTA data and periodically renews the subscription."""
     logging.debug("Subscribing to meters/15")
-    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 1]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
+    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 40]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
     logging.debug("Subscription message sent")
     while True:
         time.sleep(9)  # Renew just before the 10-second timeout
@@ -91,21 +91,22 @@ def process_rta_data(address, *args):
             db_values.append(db_value2)
 
         # Print the dB values for the RTA frequency bands
-        for i, db_value in enumerate(db_values):
+        for i, db_value in enumerate(db_values[2:]):
             print(f"{address} ~ RTA Frequency Band {i+1}: {db_value} dB")
+
         with open(rta_db_values_csv_file_path, 'a', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
-            for i, db_value in enumerate(db_values):
+            for i, db_value in enumerate(db_values[2:]):
                 csvwriter.writerow([f'Band {i+1}', db_value])
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
 
     # Save args to CSV file
-    with open(rta_db_values_csv_file_path, 'a', newline='') as csvfile:
+"""     with open(rta_db_values_csv_file_path, 'a', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
         # Convert args to string for easy CSV writing, or handle individually
         args_str = ', '.join(str(arg) for arg in args)
-        csvwriter.writerow([address, args_str])
+        csvwriter.writerow([address, args_str]) """
 
 # data points from mixer to convert to dB (fader)
 fader_positions = np.array([0.0000, 0.2502, 0.5005, 0.6256, 0.6999, 0.7478, 0.8250, 0.9003, 0.9501, 1.0000])
