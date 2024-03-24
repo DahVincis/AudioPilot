@@ -71,7 +71,7 @@ def handlerRTA(address, *args):
 
         # Print the dB values for the RTA frequency bands
         for i, dbValue in enumerate(dbValues):
-            print(f"{address} ~ RTA Frequency Band {i+1}: {dbValue} dB")
+            print(f"{address} ~ RTA Frequency Band {i+1}: {dbValue[:2]} dB")
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
 
