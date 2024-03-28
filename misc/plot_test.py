@@ -16,12 +16,12 @@ frequencies = [
 
 df = pd.read_csv('rta_db1.csv')
 
-df['dB Value'] = df['dB Value'].astype(float).clip(0.0, -130.0)
+df['dB Value'] = df['dB Value'].astype(float).clip(0.0, -128.0)
 
 plt.figure(figsize=(20, 6))
 
 bars = plt.bar(df['Frequency Band'], df['dB Value'])
-plt.ylim(0.0, -130.0) 
+plt.ylim(0.0, -128.0) 
 
 plt.xlabel('Frequency Band')
 plt.ylabel('dB Value')
