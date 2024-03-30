@@ -45,7 +45,7 @@ def initialize_csv_files():
 
 args_data_csv_file_path = 'args_data.csv'
 db_values_csv_file_path = 'db_values.csv'
-rta_db_values_csv_file_path = 'rta_db_values.csv'
+rta_db_values_csv_file_path = 'rta_db_values1.csv'
 
 # keep mixer awake by sending xremote and messages to be received
 def keep_behringer_awake():
@@ -98,8 +98,8 @@ def process_rta_data(address, *args):
             if short_int1 >= 0x8000: short_int1 -= 0x10000
             if short_int2 >= 0x8000: short_int2 -= 0x10000
             # Convert to dB values
-            db_value1 = short_int1 / 256.0
-            db_value2 = short_int2 / 256.0
+            db_value1 = (short_int1 / 256.0) + 24
+            db_value2 = (short_int2 / 256.0) + 24
             db_values.append(db_value1)
             db_values.append(db_value2)
 

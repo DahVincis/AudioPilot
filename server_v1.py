@@ -50,6 +50,8 @@ def subRenewRTA():
         logging.debug("Renewing subscription to meters/15")
         client.send_message("/renew", [""])
 
+gain = 24
+
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
     print(f"Entered handlerRTA with address: {address} and args: {args}")
@@ -77,8 +79,8 @@ def handlerRTA(address, *args):
             if shortINT1 >= 0x8000: shortINT1 -= 0x10000
             if shortINT2 >= 0x8000: shortINT2 -= 0x10000
             # Convert to dB values
-            dbValue1 = shortINT1 / 256.0
-            dbValue2 = shortINT2 / 256.0
+            dbValue1 = (shortINT1 / 256.0) + gain
+            dbValue2 = (shortINT2 / 256.0) + gain
             dbValues.append(dbValue1)
             dbValues.append(dbValue2)
 
