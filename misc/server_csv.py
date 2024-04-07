@@ -13,7 +13,7 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32_IP = '192.168.1.21'
+X32_IP = '192.168.0.72'
 client = SimpleUDPClient(X32_IP, 10023)
 
 frequencies = [
@@ -45,46 +45,35 @@ def initCSVFiles():
 
 argsDataCSVPath = 'args_data.csv'
 dbValueCSVPath = 'db_values.csv'
-RTAdbValuePath = 'rta_db_values1.csv'
+RTAdbValuePath = 'rta_db_values2.csv'
 
 # keep mixer awake by sending xremote and messages to be received
 def keepMixerAwake():
-    """Sends keep-alive messages to Behringer."""
+    logging.debug("Sending keep-alive messages to Behringer")
+
     while True:
-        logging.debug("Sending keep-alive messages to Behringer")
         client.send_message('/xremote', None)
-        client.send_message('/ch/18/mix/fader', None)
-        client.send_message('/ch/19/mix/fader', None)
-        client.send_message('/ch/20/mix/fader', None)
-        client.send_message('/ch/22/mix/fader', None)
-        client.send_message('/ch/29/mix/fader', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
 def subRenewRTA():
-    """Subscribes to RTA data and periodically renews the subscription."""
-    logging.debug("Subscribing to meters/15")
-    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 40]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
-    logging.debug("Subscription message sent")
+
     while True:
-        time.sleep(9)  # Renew just before the 10-second timeout
-        logging.debug("Renewing subscription to meters/15")
-        client.send_message("/renew", [""])
+        client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
+        time.sleep(1)  # Renew just before the 10-second timeout
+
+gain = 38
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
-    print(f"Entered process_rta_data with address: {address} and args: {args}")
     if not args:
         logging.error(f"No RTA data received on {address}")
         return
 
     blobRTA = args[0]
-    print(f"RTA blob size: {len(blobRTA)}")
-    print(f"RTA blob content: {blobRTA.hex()}")
 
     # Calculate the number of 32-bit integers (4 bytes each) in the blob
     dataPoints = len(blobRTA) // 4
-    print(f"Number of data points: {dataPoints}")
 
     try:
         # Dynamically unpack the blob based on its actual size
@@ -98,8 +87,8 @@ def handlerRTA(address, *args):
             if shortINT1 >= 0x8000: shortINT1 -= 0x10000
             if shortINT2 >= 0x8000: shortINT2 -= 0x10000
             # Convert to dB values
-            dbValue1 = (shortINT1 / 256.0) + 24
-            dbValue2 = (shortINT2 / 256.0) + 24
+            dbValue1 = (shortINT1 / 256.0) + gain
+            dbValue2 = (shortINT2 / 256.0) + gain
             dbValues.append(dbValue1)
             dbValues.append(dbValue2)
 
@@ -112,7 +101,7 @@ def handlerRTA(address, *args):
             csvwriter = csv.writer(csvfile)
             for i, dbValue in enumerate(dbValues[2:]):
                 freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
-                csvwriter.writerow([f'Band {freqLabel}', dbValue])
+                csvwriter.writerow([f'{freqLabel}', dbValue])
 
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")

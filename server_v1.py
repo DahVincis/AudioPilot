@@ -12,7 +12,7 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32IP = '192.168.1.21'
+X32IP = '192.168.0.72'
 client = SimpleUDPClient(X32IP, 10023)
 
 frequencies = [
@@ -30,42 +30,36 @@ frequencies = [
 
 # keep mixer awake by sending xremote and messages to be received
 def keepMixerAwake():
+    logging.debug("Sending keep-alive messages to Behringer")
+
     while True:
-        logging.debug("Sending keep-alive messages to Behringer")
         client.send_message('/xremote', None)
-        client.send_message('/ch/04/mix/fader', None)
-        client.send_message('/ch/05/mix/fader', None)
-        client.send_message('/ch/06/mix/fader', None)
-        client.send_message('/ch/07/mix/fader', None)
-        client.send_message('/ch/08/mix/fader', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
 def subRenewRTA():
-    logging.debug("Subscribing to meters/15")
-    client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 40]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
-    logging.debug("Subscription message sent")
-    while True:
-        time.sleep(9)  # Renew just before the 10-second timeout
-        logging.debug("Renewing subscription to meters/15")
-        client.send_message("/renew", [""])
 
-gain = 24
+    while True:
+        client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
+        time.sleep(0.5)  # Renew just before the 10-second timeout
+
+
+gain = 38
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
-    print(f"Entered handlerRTA with address: {address} and args: {args}")
+    # print(f"Entered handlerRTA with address: {address} and args: {args}")
     if not args:
         logging.error(f"No RTA data received on {address}")
         return
 
     blobRTA = args[0]
-    print(f"RTA blob size: {len(blobRTA)}")
+    dataPoints = len(blobRTA) // 4
+    """print(f"RTA blob size: {len(blobRTA)}")
     print(f"RTA blob content: {blobRTA.hex()}")
 
     # Calculate the number of 32-bit integers (4 bytes each) in the blob
-    dataPoints = len(blobRTA) // 4
-    print(f"Number of data points: {dataPoints}")
+    print(f"Number of data points: {dataPoints}") """
 
     try:
         # Dynamically unpack the blob based on its actual size
@@ -85,7 +79,7 @@ def handlerRTA(address, *args):
             dbValues.append(dbValue2)
 
         # Print the dB values for the RTA frequency bands
-        for i, dbValue in enumerate(dbValues):
+        for i, dbValue in enumerate(dbValues[2:]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
             print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
 

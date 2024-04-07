@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 # Load the CSV file with multiple updates
 csvPath = 'rta_db_values1.csv'  # Update this path as needed
@@ -20,7 +21,7 @@ totalUpdates = updateData['Update Index'].max()
 for updateNumber in range(1, totalUpdates + 1):
     updateData = updateData[updateData['Update Index'] == updateNumber]
     
-    plt.figure(figsize=(15, 6))
+    plt.figure(figsize=(20, 6))
     plt.plot(updateData['Frequency'], updateData['dB Value'], marker='o', linestyle='-')
     plt.xscale('log')
     plt.xlabel('Frequency (Hz)')
