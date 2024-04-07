@@ -48,18 +48,12 @@ gain = 38
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
-    # print(f"Entered handlerRTA with address: {address} and args: {args}")
     if not args:
         logging.error(f"No RTA data received on {address}")
         return
 
     blobRTA = args[0]
     dataPoints = len(blobRTA) // 4
-    """print(f"RTA blob size: {len(blobRTA)}")
-    print(f"RTA blob content: {blobRTA.hex()}")
-
-    # Calculate the number of 32-bit integers (4 bytes each) in the blob
-    print(f"Number of data points: {dataPoints}") """
 
     try:
         # Dynamically unpack the blob based on its actual size
