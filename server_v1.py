@@ -1,4 +1,3 @@
-import csv
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
@@ -13,8 +12,8 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32_IP = '192.168.0.72'
-client = SimpleUDPClient(X32_IP, 10023)
+X32IP = '192.168.0.72'
+client = SimpleUDPClient(X32IP, 10023)
 
 frequencies = [
     20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
@@ -28,24 +27,6 @@ frequencies = [
     5000, 5360, 5740, 6160, 6600, 7070, 7580, 8120, 8710, 9330,
     10000, 10720, 11490, 12310, 13200, 14140, 15160, 16250, 17410, 18660
 ]
-
-# Initialize CSV files with headers outside of the functions
-def initCSVFiles():
-    with open(argsDataCSVPath, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Address', 'Args'])
-    
-    with open(dbValueCSVPath, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Address', 'Fader', 'dB Value'])
-    
-    with open(RTAdbValuePath, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Frequency Band', 'dB Value'])
-
-argsDataCSVPath = 'args_data.csv'
-dbValueCSVPath = 'db_values.csv'
-RTAdbValuePath = 'rta_db_values2.csv'
 
 # keep mixer awake by sending xremote and messages to be received
 def keepMixerAwake():
@@ -62,7 +43,9 @@ def subRenewRTA():
         client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
         time.sleep(1)  # Renew just before the 10-second timeout
 
+
 gain = 38
+dataRTA= {}
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
@@ -71,8 +54,6 @@ def handlerRTA(address, *args):
         return
 
     blobRTA = args[0]
-
-    # Calculate the number of 32-bit integers (4 bytes each) in the blob
     dataPoints = len(blobRTA) // 4
 
     try:
@@ -96,12 +77,11 @@ def handlerRTA(address, *args):
         for i, dbValue in enumerate(dbValues[2:]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
             print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
-
-        with open(RTAdbValuePath, 'a', newline='') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            for i, dbValue in enumerate(dbValues[2:]):
-                freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
-                csvwriter.writerow([f'{freqLabel}', dbValue])
+            if freqLabel in dataRTA:
+                dataRTA[freqLabel].append(dbValue)
+            else:
+                dataRTA[freqLabel] = [dbValue]
+        print(f"{dataRTA}")
 
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
@@ -116,40 +96,17 @@ p = Polynomial.fit(faderPOS, dbValues, deg=4)
 # handler for converting to dB and printing all fader type data
 def handlerFader(address, *args):
     if args and isinstance(args[0], float):
-        float_value = args[0]
-        db_value = p(float_value)
-        print(f"[{address}] ~ Fader value: {db_value:.2f} dB")
+        floatVal = args[0]
+        dbVal = p(floatVal)
+        print(f"[{address}] ~ Fader value: {dbVal:.2f} dB")
     else:
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
-    with open(dbValueCSVPath, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([address, 'Fader', db_value])
-
 
 # if message received does not have a mapped handler, use default
 def handlerDefault(address, *args):
-    """Default handler for all messages."""
     logging.info(f"Received fader message on {address}. Args: {args}")
-    # Modify default_handler to write args data to CSV
-    with open(argsDataCSVPath, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([address, args])
-
-
-argsDataCSVPath = 'args_data.csv'
-dbValueCSVPath = 'db_values.csv'
-
-# Initialize CSV files with headers
-with open(argsDataCSVPath, mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(['Address', 'Args'])
-
-with open(dbValueCSVPath, mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(['Address', 'Frequency Band', 'dB Value'])
 
 if __name__ == "__main__":
-    initCSVFiles()
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", default="0.0.0.0", help="The ip to listen on")
     parser.add_argument("--port", type=int, default=10024, help="The port to listen on")
@@ -164,11 +121,11 @@ if __name__ == "__main__":
     logging.info(f"Serving on {server.server_address}")
     client._sock = server.socket
 
-    keep_alive_thread = threading.Thread(target=keepMixerAwake, daemon=True)
-    keep_alive_thread.start()
+    threadKeepAlive = threading.Thread(target=keepMixerAwake, daemon=True)
+    threadKeepAlive.start()
 
     # start the RTA subscription and renewal in a separate thread
-    rta_subscription_thread = threading.Thread(target=subRenewRTA, daemon=True)
-    rta_subscription_thread.start()
+    threadRTASub = threading.Thread(target=subRenewRTA, daemon=True)
+    threadRTASub.start()
 
     server.serve_forever()
