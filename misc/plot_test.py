@@ -4,11 +4,11 @@ import numpy as np
 import time
 
 # Load the CSV file with multiple updates
-csvPath = 'rta_db_values1.csv'  # Update this path as needed
+csvPath = 'rta_db_values2.csv'  # Update this path as needed
 updateData = pd.read_csv(csvPath)
 
 # Extract the numeric part from the 'Frequency Band' column
-updateData['Frequency'] = updateData['Frequency Band'].str.extract(r'(\d+)').astype(int)
+updateData['Frequency'] = updateData['Frequency Band']
 
 # Find rows where the frequency resets to 20 to mark the start of a new update
 resets = updateData['Frequency'] == 20
