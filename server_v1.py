@@ -12,7 +12,7 @@ import numpy as np
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32IP = '192.168.0.72'
+X32IP = '192.168.10.104'
 client = SimpleUDPClient(X32IP, 10023)
 
 frequencies = [
@@ -34,6 +34,7 @@ def keepMixerAwake():
 
     while True:
         client.send_message('/xremote', None)
+        client.send_message('/xinfo', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
@@ -42,7 +43,6 @@ def subRenewRTA():
     while True:
         client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
         time.sleep(1)  # Renew just before the 10-second timeout
-
 
 gain = 38
 dataRTA= {}
