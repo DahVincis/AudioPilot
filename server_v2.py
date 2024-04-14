@@ -11,13 +11,46 @@ from numpy.polynomial.polynomial import Polynomial
 import numpy as np
 import socket
 import select
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Setup logging
+# setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-X32IP = '192.168.10.104'
-client = SimpleUDPClient(X32IP, 10023)
+# check a single IP for a mixer
+def checkMixerIP(ip, port):
+    try:
+        # start a temporary client to search for mixers
+        tempClient = SimpleUDPClient(ip, port)
+        tempClient.send_message('/xinfo', None)
 
+        # set a timeout for the socket to wait for a response
+        ready = select.select([tempClient._sock], [], [], 0.1)
+        if ready[0]:
+            data, addr = tempClient._sock.recvfrom(1024)
+            logging.info(f"Discovered mixer at {addr[0]}")
+            return addr[0], data
+    except Exception as e:
+        logging.debug(f"No mixer at {ip}: {e}")
+    return None
+
+def discMixers():
+    discIPs = {}
+    discPort = 10023  # The port where mixers listen for OSC messages
+    subnet = "192.168.10"
+
+    with ThreadPoolExecutor(max_workers=100) as executor:
+        futures = {executor.submit(checkMixerIP, f"{subnet}.{i}", discPort): i for i in range(256)}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                ip, rawData = result
+                details = handlerXInfo(rawData)
+                discIPs[ip] = details
+                logging.info(f"Discovered mixer at {ip} with details: {details}")
+
+    return discIPs
+
+# hardcoded frequencies
 frequencies = [
     20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
     39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
@@ -45,7 +78,7 @@ def subRenewRTA():
 
     while True:
         client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
-        time.sleep(1)  # Renew just before the 10-second timeout
+        time.sleep(1)  # renew just before the 10-second timeout
 
 gain = 38
 dataRTA= {}
@@ -60,23 +93,23 @@ def handlerRTA(address, *args):
     dataPoints = len(blobRTA) // 4
 
     try:
-        # Dynamically unpack the blob based on its actual size
+        # dynamically unpack the blob based on its actual size
         ints = struct.unpack(f'<{dataPoints}I', blobRTA)
         dbValues = []
         for intValue in ints:
-            # Process each 32-bit integer into two short integers and convert to dB
+            # process each 32-bit integer into two short integers and convert to dB
             shortINT1 = intValue & 0xFFFF
             shortINT2 = (intValue >> 16) & 0xFFFF
-            # Adjusting for signed values
+            # adjusting for signed values
             if shortINT1 >= 0x8000: shortINT1 -= 0x10000
             if shortINT2 >= 0x8000: shortINT2 -= 0x10000
-            # Convert to dB values
+            # convert to dB values
             dbValue1 = (shortINT1 / 256.0) + gain
             dbValue2 = (shortINT2 / 256.0) + gain
             dbValues.append(dbValue1)
             dbValues.append(dbValue2)
 
-        # Print the dB values for the RTA frequency bands
+        # print the dB values for the RTA frequency bands
         for i, dbValue in enumerate(dbValues[2:]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
             print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
@@ -105,16 +138,65 @@ def handlerFader(address, *args):
     else:
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
 
+# handler for xinfo data
+def handlerXInfo(data):
+    try:
+        # look for the first null character which ends the address pattern
+        addressEnd = data.find(b'\x00')
+        data = data[(addressEnd + 4) & ~3:]  # move past the address and align to the next 4-byte boundary
+
+        # extract type tags starting right after the first comma
+        startTypeTag = data.find(b',') + 1
+        endTypeTag = data.find(b'\x00', startTypeTag)
+        typeTag = data[startTypeTag:endTypeTag].decode()
+
+        # move to the argument data
+        data = data[(endTypeTag + 4) & ~3:]  # align to 4-byte boundary
+
+        # process arguments according to type tags
+        arguments = []
+        for tag in typeTag:
+            if tag == 's':  # check if string
+                endString = data.find(b'\x00')
+                argument = data[:endString].decode()
+                arguments.append(argument)
+                data = data[(endString + 4) & ~3:]  # move past the string and align
+
+        return " | ".join(arguments)
+    except Exception as e:
+        logging.error(f"Error parsing OSC message: {e}")
+        return "Error parsing data"
+
 # if message received does not have a mapped handler, use default
 def handlerDefault(address, *args):
     logging.info(f"Received fader message on {address}. Args: {args}")
 
 if __name__ == "__main__":
+    # search mixers on the network
+    mixers = discMixers()
+    if not mixers:
+        print("No mixers found.")
+        exit()
+
+    # options for user
+    for idx, (ip, details) in enumerate(mixers.items(), start=1):
+        print(f"{idx}: Mixer at IP {ip} with details: {details}")
+
+    # user selects mixer
+    chosen = int(input("Select the number for the desired mixer: ")) - 1
+    chosenIP = list(mixers.keys())[chosen]
+
+    # set the mixer IP
+    X32IP = chosenIP
+    client = SimpleUDPClient(X32IP, 10023)
+
+    # argument parser for IP and port
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", default="0.0.0.0", help="The ip to listen on")
     parser.add_argument("--port", type=int, default=10024, help="The port to listen on")
     args = parser.parse_args()
 
+    # map handlers to OSC addresses
     dispatcher = Dispatcher()
     dispatcher.map("/meters", handlerRTA)
     dispatcher.map("/*/*/mix/fader", handlerFader)
@@ -124,11 +206,12 @@ if __name__ == "__main__":
     logging.info(f"Serving on {server.server_address}")
     client._sock = server.socket
 
+    # start threads for keep alive and RTA subscription
     threadKeepAlive = threading.Thread(target=keepMixerAwake, daemon=True)
     threadKeepAlive.start()
 
-    # start the RTA subscription and renewal in a separate thread
     threadRTASub = threading.Thread(target=subRenewRTA, daemon=True)
     threadRTASub.start()
 
+    # Start the OSC server
     server.serve_forever()
