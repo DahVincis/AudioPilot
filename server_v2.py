@@ -4,7 +4,6 @@ from pythonosc.udp_client import SimpleUDPClient
 import argparse
 import time
 import threading
-import logging
 import struct
 import select
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -23,9 +22,6 @@ frequencies = [
     10000, 10720, 11490, 12310, 13200, 14140, 15160, 16250, 17410, 18660
 ]
 
-# setup logging
-logging.basicConfig(level=logging.DEBUG)
-
 # check a single IP for a mixer
 def checkMixerIP(ip, port):
     try:
@@ -37,10 +33,10 @@ def checkMixerIP(ip, port):
         ready = select.select([tempClient._sock], [], [], 0.1)
         if ready[0]:
             data, addr = tempClient._sock.recvfrom(1024)
-            logging.info(f"Discovered mixer at {addr[0]}")
+            print(f"Discovered mixer at {addr[0]}")
             return addr[0], data
     except Exception as e:
-        logging.debug(f"No mixer at {ip}: {e}")
+        print(f"No mixer at {ip}: {e}")
     return None
 
 def discMixers():
@@ -56,13 +52,13 @@ def discMixers():
                 ip, rawData = result
                 details = handlerXInfo(rawData)
                 discIPs[ip] = details
-                logging.info(f"Discovered mixer at {ip} with details: {details}")
+                print(f"Discovered mixer at {ip} with details: {details}")
 
     return discIPs
 
 # keep mixer awake by sending xremote and messages to be received
 def keepMixerAwake():
-    logging.debug("Sending keep-alive messages to Behringer")
+    print("Sending keep-alive messages to Behringer")
 
     while True:
         client.send_message('/xremote', None)
@@ -86,7 +82,7 @@ dataRTA= {}
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
     if not args:
-        logging.error(f"No RTA data received on {address}")
+        print(f"No RTA data received on {address}")
         return
 
     blobRTA = args[0]
@@ -120,7 +116,7 @@ def handlerRTA(address, *args):
         print(f"{dataRTA}")
 
     except Exception as e:
-        logging.error(f"Error processing RTA data: {e}")
+        print(f"Error processing RTA data: {e}")
 
 # handler for converting to dB and printing all fader type data, based on C code in x32-osc.pdf (page 133)
 def handlerFader(address, *args):
@@ -135,7 +131,7 @@ def handlerFader(address, *args):
         elif f >= 0.0:
             d = f * 480.0 - 90.0  # min dB value: -90 or -oo
         else:
-            logging.error(f"Invalid fader value: {f}")
+            print(f"Invalid fader value: {f}")
             return
         print(f"[{address}] ~ Fader value: {d:.2f} dB")
     else:
@@ -195,12 +191,12 @@ def handlerXInfo(data):
 
         return " | ".join(arguments)
     except Exception as e:
-        logging.error(f"Error parsing OSC message: {e}")
+        print(f"Error parsing data: {e}")
         return "Error parsing data"
 
 # if message received does not have a mapped handler, use default
 def handlerDefault(address, *args):
-    logging.info(f"Received fader message on {address}. Args: {args}")
+    print(f"Received fader message on {address}. Args: {args}")
 
 if __name__ == "__main__":
     # search mixers on the network
@@ -235,7 +231,7 @@ if __name__ == "__main__":
     dispatcher.set_default_handler(handlerDefault)
 
     server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
-    logging.info(f"Serving on {server.server_address}")
+    print(f"Serving on {server.server_address}")
     client._sock = server.socket
 
     # start threads for keep alive and RTA subscription
