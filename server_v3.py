@@ -81,15 +81,6 @@ def subRenewRTA():
 gain = 38
 dataRTA= {}
 
-app = QApplication([])
-win = pg.GraphicsLayoutWidget(show=True, title="Real-Time Frequency Response")
-plot = win.addPlot(title="Frequency Response Histogram")
-plot.setLogMode(x=True, y=False)
-plot.setYRange(-90, 0)
-plot.setLabel('bottom', 'Frequency', units='Hz')
-plot.setLabel('left', 'dB Value')
-bars = []
-
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
     if not args:
@@ -208,6 +199,15 @@ def handlerXInfo(data):
 # if message received does not have a mapped handler, use default
 def handlerDefault(address, *args):
     print(f"Received fader message on {address}. Args: {args}")
+
+app = QApplication([])
+win = pg.GraphicsLayoutWidget(show=True, title="Real-Time Frequency Response")
+plot = win.addPlot(title="Frequency Response Histogram")
+plot.setLogMode(x=True, y=False)
+plot.setYRange(-90, 0)
+plot.setLabel('bottom', 'Frequency', units='Hz')
+plot.setLabel('left', 'dB Value')
+bars = []
 
 def update_plot():
     plot.clear()
