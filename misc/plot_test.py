@@ -39,6 +39,6 @@ for updateNumber in range(1, totalUpdates + 1):
         plt.xlim(min(currentUpdateData['Frequency']), max(currentUpdateData['Frequency']))
     
     plt.draw()
-    plt.pause(0.5)  # Pause for 0.1 second
+    plt.pause(0.1)  # Pause for 0.1 second
 
 plt.ioff()  # Turn off interactive mode

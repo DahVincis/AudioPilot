@@ -5,8 +5,8 @@ import pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
 
-# Load and prepare data from the provided CSV file
-csvPath = 'rta_db_values2.csv'  # Adjust path if necessary
+# Load and prepare data from the CSV file
+csvPath = 'rta_db_values2.csv'
 updateData = pd.read_csv(csvPath)
 updateData['Frequency'] = pd.to_numeric(updateData['Frequency Band'], errors='coerce')
 resets = updateData['Frequency'] == 20
@@ -26,9 +26,16 @@ plot.setYRange(-90, 0)
 plot.setLabel('bottom', 'Frequency', units='Hz')
 plot.setLabel('left', 'dB Value')
 
+bars = []
+
+# Pre-calculate x-axis ticks
+min_freq = updateData['Frequency'].min()
+max_freq = updateData['Frequency'].max()
+xticks = np.logspace(np.log10(min_freq), np.log10(max_freq), num=20)
+plot.getAxis('bottom').setTicks([[(np.log10(v), str(int(v))) for v in xticks]])
+
 # Function to update the plot
 def update(updateNumber):
-    plot.clear()
     if updateNumber > totalUpdates:  # Stop updating if no more data
         timer.stop()
         return
@@ -41,20 +48,21 @@ def update(updateNumber):
     # Calculate color based on dB value
     colors = ['r' if db >= threshold_80_percent else 'y' if threshold_80_percent > db >= threshold_75_percent else 'b' for db in dbValues]
     
-    # Draw bars
-    for freq, db, color in zip(frequencies, dbValues, colors):
-        plot.plot([freq, freq], [db, -90], pen=pg.mkPen(color, width=3))
-
-    # Set x-axis to show at least 20 values
-    xticks = np.logspace(np.log10(min(frequencies)), np.log10(max(frequencies)), num=20)
-    plot.getAxis('bottom').setTicks([[(np.log10(v), str(int(v))) for v in xticks]])
+    if not bars:  # First update
+        for freq, db, color in zip(frequencies, dbValues, colors):
+            bar = plot.plot([freq, freq], [db, -90], pen=pg.mkPen(color, width=3))
+            bars.append(bar)
+    else:  # Update existing bars
+        for bar, freq, db, color in zip(bars, frequencies, dbValues, colors):
+            bar.setData([freq, freq], [db, -90])
+            bar.setPen(pg.mkPen(color, width=3))
 
 updateNumber = 1  # Start from the first segment
 
 # Timer for periodic update
 timer = QTimer()
 timer.timeout.connect(lambda: update(updateNumber))
-timer.start(500)  # Update every 0.5 seconds
+timer.start(100)  # Update every 0.1 seconds
 
 # Increase update number for next cycle
 def increment_update_number():

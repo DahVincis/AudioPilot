@@ -7,6 +7,10 @@ import threading
 import struct
 import select
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import pyqtgraph as pg
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QTimer
+import numpy as np
 
 # hardcoded frequencies
 frequencies = [
@@ -76,6 +80,15 @@ def subRenewRTA():
 
 gain = 38
 dataRTA= {}
+
+app = QApplication([])
+win = pg.GraphicsLayoutWidget(show=True, title="Real-Time Frequency Response")
+plot = win.addPlot(title="Frequency Response Histogram")
+plot.setLogMode(x=True, y=False)
+plot.setYRange(-90, 0)
+plot.setLabel('bottom', 'Frequency', units='Hz')
+plot.setLabel('left', 'dB Value')
+bars = []
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
@@ -196,6 +209,15 @@ def handlerXInfo(data):
 def handlerDefault(address, *args):
     print(f"Received fader message on {address}. Args: {args}")
 
+def update_plot():
+    plot.clear()
+    frequencies_sorted = sorted(dataRTA.keys())
+    for freq in frequencies_sorted:
+        db_values = dataRTA[freq]
+        avg_db = np.mean(db_values) if db_values else -90
+        color = 'r' if avg_db >= -18 else 'y' if -22.5 <= avg_db < -18 else 'b'
+        plot.plot([freq, freq], [avg_db, -90], pen=pg.mkPen(color, width=3))
+
 if __name__ == "__main__":
     # search mixers on the network
     mixers = discMixers()
@@ -239,5 +261,9 @@ if __name__ == "__main__":
     threadRTASub = threading.Thread(target=subRenewRTA, daemon=True)
     threadRTASub.start()
 
-    # Start the OSC server
-    server.serve_forever()
+    timer = QTimer()
+    timer.timeout.connect(update_plot)
+    timer.start(1000)  # Update the plot every second
+
+    # Start the PyQtGraph Application and OSC server
+    sys.exit(app.exec_())
