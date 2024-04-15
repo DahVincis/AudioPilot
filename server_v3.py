@@ -140,30 +140,30 @@ def handlerFader(address, *args):
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
 
 # Function to convert float value to dB for preamp trim
-def float_to_preamp_db(trim_float):
+def floatToDB(trimFloat):
     # Define the scale boundaries for preamp trim
-    float_min = 0.0
-    float_max = 0.25
-    db_min = -18.0
-    db_max = 18.0
+    floatMin = 0.0
+    floatMax = 0.25
+    dbMin = -18.0
+    dbMax = 18.0
 
     # Linear interpolation within the range
-    if 0 <= trim_float <= 0.25:
-        db_value = (trim_float - float_min) * (db_max - db_min) / (float_max - float_min) + db_min
+    if 0 <= trimFloat <= 0.25:
+        dbValue = (trimFloat - floatMin) * (dbMax - dbMin) / (floatMax - floatMin) + dbMin
     else:
         # Handle values outside the range, if any
-        db_value = "Out of range"
-    return db_value
+        dbValue = "Out of range"
+    return dbValue
 
 # Handler for the preamp trim messages
 def handlerPreampTrim(address, *args):
     if args and isinstance(args[0], float):
-        trim_float = args[0]  # Assuming the trim float value is the first argument
-        db_value = float_to_preamp_db(trim_float)
-        if isinstance(db_value, str):
-            print(f"[{address}] ~ Preamp trim value: {db_value}")
+        trimFloat = args[0]  # Assuming the trim float value is the first argument
+        dbValue = floatToDB(trimFloat)
+        if isinstance(dbValue, str):
+            print(f"[{address}] ~ Preamp trim value: {dbValue}")
         else:
-            print(f"[{address}] ~ Preamp trim value: {db_value:.2f} dB")
+            print(f"[{address}] ~ Preamp trim value: {dbValue:.2f} dB")
     else:
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
 
@@ -209,14 +209,14 @@ plot.setLabel('bottom', 'Frequency', units='Hz')
 plot.setLabel('left', 'dB Value')
 bars = []
 
-def update_plot():
+def updatePlot():
     plot.clear()
-    frequencies_sorted = sorted(dataRTA.keys())
-    for freq in frequencies_sorted:
-        db_values = dataRTA[freq]
-        avg_db = np.mean(db_values) if db_values else -90
-        color = 'r' if avg_db >= -18 else 'y' if -22.5 <= avg_db < -18 else 'b'
-        plot.plot([freq, freq], [avg_db, -90], pen=pg.mkPen(color, width=3))
+    freqSorted = sorted(dataRTA.keys())
+    for freq in freqSorted:
+        dbValues = dataRTA[freq]
+        dbAvg = np.mean(dbValues) if dbValues else -90
+        color = 'r' if dbAvg >= -18 else 'y' if -22.5 <= dbAvg < -18 else 'b'
+        plot.plot([freq, freq], [dbAvg, -90], pen=pg.mkPen(color, width=3))
 
 if __name__ == "__main__":
     # search mixers on the network
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     threadRTASub.start()
 
     timer = QTimer()
-    timer.timeout.connect(update_plot)
+    timer.timeout.connect(updatePlot)
     timer.start(1000)  # Update the plot every second
 
     # Start the PyQtGraph Application and OSC server
