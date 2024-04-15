@@ -68,6 +68,9 @@ def keepMixerAwake():
         client.send_message('/xremote', None)
         client.send_message('/xinfo', None)
         client.send_message('/ch/01/mix/fader', None)
+        client.send_message('/ch/01/dyn/mgain', None)
+        client.send_message('/ch/02/dyn/mgain', None)
+        client.send_message('/ch/03/dyn/mgain', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
@@ -109,12 +112,12 @@ def handlerRTA(address, *args):
         # print the dB values for the RTA frequency bands
         for i, dbValue in enumerate(dbValues[2:]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
-            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
+            #print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
             if freqLabel in dataRTA:
                 dataRTA[freqLabel].append(dbValue)
             else:
                 dataRTA[freqLabel] = [dbValue]
-        print(f"{dataRTA}")
+        #print(f"{dataRTA}")
 
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
@@ -135,6 +138,34 @@ def handlerFader(address, *args):
             logging.error(f"Invalid fader value: {f}")
             return
         print(f"[{address}] ~ Fader value: {d:.2f} dB")
+    else:
+        print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
+
+# Function to convert float value to dB for preamp trim
+def float_to_preamp_db(trim_float):
+    # Define the scale boundaries for preamp trim
+    float_min = 0.0
+    float_max = 0.25
+    db_min = -18.0
+    db_max = 18.0
+
+    # Linear interpolation within the range
+    if 0 <= trim_float <= 0.25:
+        db_value = (trim_float - float_min) * (db_max - db_min) / (float_max - float_min) + db_min
+    else:
+        # Handle values outside the range, if any
+        db_value = "Out of range"
+    return db_value
+
+# Handler for the preamp trim messages
+def handlerPreampTrim(address, *args):
+    if args and isinstance(args[0], float):
+        trim_float = args[0]  # Assuming the trim float value is the first argument
+        db_value = float_to_preamp_db(trim_float)
+        if isinstance(db_value, str):
+            print(f"[{address}] ~ Preamp trim value: {db_value}")
+        else:
+            print(f"[{address}] ~ Preamp trim value: {db_value:.2f} dB")
     else:
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
 
@@ -200,6 +231,7 @@ if __name__ == "__main__":
     dispatcher = Dispatcher()
     dispatcher.map("/meters", handlerRTA)
     dispatcher.map("/*/*/mix/fader", handlerFader)
+    dispatcher.map("/*/*/preamp/trim", handlerPreampTrim)
     dispatcher.set_default_handler(handlerDefault)
 
     server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
