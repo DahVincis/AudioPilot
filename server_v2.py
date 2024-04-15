@@ -9,6 +9,20 @@ import struct
 import select
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# hardcoded frequencies
+frequencies = [
+    20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
+    39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
+    78, 84, 90, 96, 103, 110, 118, 127, 136, 146,
+    156, 167, 179, 192, 206, 221, 237, 254, 272, 292,
+    313, 335, 359, 385, 412, 442, 474, 508, 544, 583,
+    625, 670, 718, 769, 825, 884, 947, 1020, 1090, 1170,
+    1250, 1340, 1440, 1540, 1650, 1770, 1890, 2030, 2180, 2330,
+    2500, 2680, 2870, 3080, 3300, 3540, 3790, 4060, 4350, 4670,
+    5000, 5360, 5740, 6160, 6600, 7070, 7580, 8120, 8710, 9330,
+    10000, 10720, 11490, 12310, 13200, 14140, 15160, 16250, 17410, 18660
+]
+
 # setup logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -45,20 +59,6 @@ def discMixers():
                 logging.info(f"Discovered mixer at {ip} with details: {details}")
 
     return discIPs
-
-# hardcoded frequencies
-frequencies = [
-    20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
-    39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
-    78, 84, 90, 96, 103, 110, 118, 127, 136, 146,
-    156, 167, 179, 192, 206, 221, 237, 254, 272, 292,
-    313, 335, 359, 385, 412, 442, 474, 508, 544, 583,
-    625, 670, 718, 769, 825, 884, 947, 1020, 1090, 1170,
-    1250, 1340, 1440, 1540, 1650, 1770, 1890, 2030, 2180, 2330,
-    2500, 2680, 2870, 3080, 3300, 3540, 3790, 4060, 4350, 4670,
-    5000, 5360, 5740, 6160, 6600, 7070, 7580, 8120, 8710, 9330,
-    10000, 10720, 11490, 12310, 13200, 14140, 15160, 16250, 17410, 18660
-]
 
 # keep mixer awake by sending xremote and messages to be received
 def keepMixerAwake():
@@ -112,12 +112,12 @@ def handlerRTA(address, *args):
         # print the dB values for the RTA frequency bands
         for i, dbValue in enumerate(dbValues[2:]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
-            #print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
+            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
             if freqLabel in dataRTA:
                 dataRTA[freqLabel].append(dbValue)
             else:
                 dataRTA[freqLabel] = [dbValue]
-        #print(f"{dataRTA}")
+        print(f"{dataRTA}")
 
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
