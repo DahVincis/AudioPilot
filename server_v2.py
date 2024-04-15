@@ -1,4 +1,3 @@
-# Import necessary libraries
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
@@ -7,9 +6,6 @@ import time
 import threading
 import logging
 import struct
-from numpy.polynomial.polynomial import Polynomial
-import numpy as np
-import socket
 import select
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -71,6 +67,7 @@ def keepMixerAwake():
     while True:
         client.send_message('/xremote', None)
         client.send_message('/xinfo', None)
+        client.send_message('/ch/01/mix/fader', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
@@ -122,19 +119,22 @@ def handlerRTA(address, *args):
     except Exception as e:
         logging.error(f"Error processing RTA data: {e}")
 
-# data points from mixer to convert to dB (fader)
-faderPOS = np.array([0.0000, 0.2502, 0.5005, 0.6256, 0.6999, 0.7478, 0.8250, 0.9003, 0.9501, 1.0000])
-dbValues = np.array([-90.0, -30.0, -10.0, -5.0, -2.0, 0.0, 3.0, 6.0, 8.0, 10.0])
-
-# fit a polynomial to the data points
-p = Polynomial.fit(faderPOS, dbValues, deg=4)
-
-# handler for converting to dB and printing all fader type data
+# handler for converting to dB and printing all fader type data, based on C code in x32-osc.pdf (page 133)
 def handlerFader(address, *args):
     if args and isinstance(args[0], float):
-        floatVal = args[0]
-        dbVal = p(floatVal)
-        print(f"[{address}] ~ Fader value: {dbVal:.2f} dB")
+        f = args[0]
+        if f > 0.75:
+            d = f * 40.0 - 30.0  # max dB value: +10
+        elif f > 0.5:
+            d = f * 80.0 - 50.0
+        elif f > 0.25:
+            d = f * 160.0 - 70.0
+        elif f >= 0.0:
+            d = f * 480.0 - 90.0  # min dB value: -90 or -oo
+        else:
+            logging.error(f"Invalid fader value: {f}")
+            return
+        print(f"[{address}] ~ Fader value: {d:.2f} dB")
     else:
         print(f"[{address}] ~ Incorrect argument format or length. ARGS: {args}")
 
