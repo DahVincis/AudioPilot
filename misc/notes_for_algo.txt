@@ -1,0 +1,46 @@
+minimum Q value: 3.0
+maximum Q value: 1.0
+    /ch/[01...32]/eq/[1...4]/q  logf  [10.000, 0.3, 72] 
+
+Band type: Bell/PEQ (2)
+    /ch/[01...32]/eq/[1...4]/type  enum  int [2] representing PEQ
+
+Lowcut from 20hz - 120.5hz based on 201 log scale frequency values:
+    /ch/[01...32]/eq/[1...4]/f  logf  [20.000, 20000, 201]  H (120.5hz = 0.2600)
+    /ch/[01...32]/eq/[1...4]/type  enum  int [0] representing Lowcut
+
+Low Frequency Band Parameters: (refer to frequency_OSC for OSC message values)
+    Range: 124.7 - 306.2 Hz
+    Gain lvl:
+        Low Pitch (Men):
+
+        High Pitch (Women):
+
+        Mid Pitched ("Flat"):
+
+Low Mid Frequency Band Parameters:
+    Range: 317.0 - 1k55 Hz
+    Gain lvl:
+        Low Pitch (Men):
+
+        High Pitch (Women):
+
+        Mid Pitched ("Flat"):
+
+High Mid Frequency Band Parameters:
+    Range: 1k60 - 5k02 Hz
+    Gain lvl:
+        Low Pitch (Men):
+
+        High Pitch (Women):
+
+        Mid Pitched ("Flat"):
+
+High Frequency Band Parameters:
+    Range: 5k20 - 20k00 Hz
+    Gain lvl:
+        Low Pitch (Men):
+
+        High Pitch (Women):
+
+        Mid Pitched ("Flat"):
