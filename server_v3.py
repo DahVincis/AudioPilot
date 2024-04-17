@@ -6,13 +6,14 @@ import time
 import threading
 import struct
 import select
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
 import numpy as np
 
-# hardcoded frequencies
+# hardcoded frequencies based on /meters/15 data
 frequencies = [
     20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
     39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
@@ -46,10 +47,15 @@ def checkMixerIP(ip, port):
 def discMixers():
     discIPs = {}
     discPort = 10023  # The port where mixers listen for OSC messages
-    subnet = "192.168.10"
+    subnets = ["192.168.10", "192.168.1"]
 
     with ThreadPoolExecutor(max_workers=100) as executor:
-        futures = {executor.submit(checkMixerIP, f"{subnet}.{i}", discPort): i for i in range(256)}
+        futures = {}
+        for subnet in subnets:
+            for i in range(256):
+                ipAddr = f"{subnet}.{i}"
+                futures[executor.submit(checkMixerIP, ipAddr, discPort)] = ipAddr
+        
         for future in as_completed(futures):
             result = future.result()
             if result:
@@ -78,8 +84,10 @@ def subRenewRTA():
         client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
         time.sleep(1)  # renew just before the 10-second timeout
 
+# offest for dB values
 gain = 38
-dataRTA= {}
+# Initialize dataRTA with all frequencies set to a default list with a placeholder dB value
+dataRTA = {freq: [-90] for freq in frequencies}
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
@@ -107,14 +115,18 @@ def handlerRTA(address, *args):
             dbValues.append(dbValue1)
             dbValues.append(dbValue2)
 
-        # print the dB values for the RTA frequency bands
-        for i, dbValue in enumerate(dbValues[2:]):
+        # process the dB values into the dataRTA dictionary
+        for i, dbValue in enumerate(dbValues[2:len(frequencies)+2]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
-            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
             if freqLabel in dataRTA:
                 dataRTA[freqLabel].append(dbValue)
+                # Keep only the last 10 values
+                if len(dataRTA[freqLabel]) > 10:
+                    dataRTA[freqLabel].pop(0)
             else:
                 dataRTA[freqLabel] = [dbValue]
+            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
+
         print(f"{dataRTA}")
 
     except Exception as e:
@@ -209,14 +221,25 @@ plot.setLabel('bottom', 'Frequency', units='Hz')
 plot.setLabel('left', 'dB Value')
 bars = []
 
+# update the plot with the latest dB values
 def updatePlot():
-    plot.clear()
-    freqSorted = sorted(dataRTA.keys())
-    for freq in freqSorted:
-        dbValues = dataRTA[freq]
-        dbAvg = np.mean(dbValues) if dbValues else -90
-        color = 'r' if dbAvg >= -18 else 'y' if -22.5 <= dbAvg < -18 else 'b'
-        plot.plot([freq, freq], [dbAvg, -90], pen=pg.mkPen(color, width=3))
+    for freq in frequencies:
+        dbValues = dataRTA.get(freq, [-90])
+        dbLatest = dbValues[-1] if dbValues else -90
+        color = 'r' if dbLatest >= -18 else 'y' if -22.5 <= dbLatest < -18 else 'b'
+        if freq in bars:
+            bars[freq].setData([freq, freq], [dbLatest, -90])
+            bars[freq].setPen(pg.mkPen(color, width=3))
+        else:
+            bars[freq] = plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
+
+# set logarithmic ticks for the x-axis
+def setLogTicks():
+    # Use logarithmic spacing or pick specific frequencies that are representative
+    ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
+    tick_labels = [(tick, f"{int(tick)} Hz") for tick in ticks]
+    plot.getAxis('bottom').setTicks([tick_labels])
+
 
 if __name__ == "__main__":
     # search mixers on the network
@@ -236,6 +259,8 @@ if __name__ == "__main__":
     # set the mixer IP
     X32IP = chosenIP
     client = SimpleUDPClient(X32IP, 10023)
+
+    setLogTicks()
 
     # argument parser for IP and port
     parser = argparse.ArgumentParser()
@@ -263,7 +288,7 @@ if __name__ == "__main__":
 
     timer = QTimer()
     timer.timeout.connect(updatePlot)
-    timer.start(1000)  # Update the plot every second
+    timer.start(500)  # Update the plot every second
 
     # Start the PyQtGraph Application and OSC server
     sys.exit(app.exec_())
