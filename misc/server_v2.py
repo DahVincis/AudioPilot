@@ -75,7 +75,8 @@ def subRenewRTA():
         time.sleep(1)  # renew just before the 10-second timeout
 
 gain = 38
-dataRTA= {}
+# Initialize dataRTA with all frequencies set to a default list with a placeholder dB value
+dataRTA = {freq: [-90] for freq in frequencies}
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
@@ -103,14 +104,18 @@ def handlerRTA(address, *args):
             dbValues.append(dbValue1)
             dbValues.append(dbValue2)
 
-        # print the dB values for the RTA frequency bands
-        for i, dbValue in enumerate(dbValues[2:]):
+        # process the dB values into the dataRTA dictionary
+        for i, dbValue in enumerate(dbValues[2:len(frequencies)+2]):
             freqLabel = frequencies[i] if i < len(frequencies) else "Unknown"
-            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
             if freqLabel in dataRTA:
                 dataRTA[freqLabel].append(dbValue)
+                # Keep only the last 10 values
+                if len(dataRTA[freqLabel]) > 10:
+                    dataRTA[freqLabel].pop(0)
             else:
                 dataRTA[freqLabel] = [dbValue]
+            #print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
+
         print(f"{dataRTA}")
 
     except Exception as e:

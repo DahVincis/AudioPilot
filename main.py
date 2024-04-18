@@ -153,12 +153,21 @@ band_ranges = {
              (1.0000, 20000)]
 }
 
+def find_closest_frequency(target_frequency):
+    """ Find the closest frequency in the hardcoded list to the target frequency. """
+    return min(frequencies, key=lambda x: abs(x - target_frequency))
+
+# Mapping each frequency in the band_ranges to the closest in the hardcoded frequencies
+closest_frequencies = {}
+for band, freq_list in band_ranges.items():
+    closest_frequencies[band] = [(osc, find_closest_frequency(freq)) for osc, freq in freq_list]
+
 # Function to find the highest dB frequency in a band
-def find_highest_db_frequency(band_range):
-    frequencies_in_range = [freq for freq in frequencies if band_range[0] <= freq <= band_range[1]]
-    highest_db = -90  # start with a low dB value
+def find_highest_db_frequency(band):
+    band_freqs = [freq for _, freq in closest_frequencies[band]]
+    highest_db = -90
     highest_freq = None
-    for freq in frequencies_in_range:
+    for freq in band_freqs:
         latest_db = dataRTA[freq][-1] if dataRTA[freq] else -90
         if latest_db > highest_db:
             highest_db = latest_db
@@ -169,11 +178,11 @@ def find_highest_db_frequency(band_range):
 def calculate_gain(db_value):
     freq_flat = -45  # dB level to achieve flat response
     distance = db_value - freq_flat
-    return (distance / 10)  # simplification of your gain calculation
+    return distance / 10  # Simplified gain calculation
 
 # Example of processing the 'Low' band
-low_freq, low_db = find_highest_db_frequency(band_ranges['Low'])
+low_freq, low_db = find_highest_db_frequency('Low')
 low_gain = calculate_gain(low_db)
-print(f"Low Band Frequency: {low_freq}Hz, Gain: {low_gain}dB")
+print(f"Low Band Frequency: {low_freq} Hz, Gain: {low_gain} dB")
 
-# This would need to be repeated for each band and then integrated into the OSC commands to adjust the mixer settings
+# You can replicate the above example for other bands as needed

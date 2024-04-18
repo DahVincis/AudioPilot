@@ -12,6 +12,7 @@ import pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
 import numpy as np
+from queue import Queue, Empty
 
 # hardcoded frequencies based on /meters/15 data
 frequencies = [
@@ -82,15 +83,19 @@ def subRenewRTA():
 
     while True:
         client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
-        time.sleep(1)  # renew just before the 10-second timeout
+        time.sleep(0.1)  # renew just before the 10-second timeout
 
 # offest for dB values
 gain = 38
 # Initialize dataRTA with all frequencies set to a default list with a placeholder dB value
 dataRTA = {freq: [-90] for freq in frequencies}
+first_rta_received = False
+rta_data_queue = Queue()
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
+    global first_rta_received
+
     if not args:
         print(f"No RTA data received on {address}")
         return
@@ -125,9 +130,16 @@ def handlerRTA(address, *args):
                     dataRTA[freqLabel].pop(0)
             else:
                 dataRTA[freqLabel] = [dbValue]
-            print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
+            #print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
 
-        print(f"{dataRTA}")
+        #print(f"{dataRTA}")
+
+        # Set the flag to True after receiving the first RTA data
+        if not first_rta_received:
+            first_rta_received = True
+
+        # Put the received RTA data in the queue
+        rta_data_queue.put(dataRTA)
 
     except Exception as e:
         print(f"Error processing RTA data: {e}")
@@ -212,34 +224,34 @@ def handlerXInfo(data):
 def handlerDefault(address, *args):
     print(f"Received fader message on {address}. Args: {args}")
 
-app = QApplication([])
-win = pg.GraphicsLayoutWidget(show=True, title="Real-Time Frequency Response")
-plot = win.addPlot(title="Frequency Response Histogram")
-plot.setLogMode(x=True, y=False)
-plot.setYRange(-90, 0)
-plot.setLabel('bottom', 'Frequency', units='Hz')
-plot.setLabel('left', 'dB Value')
-bars = []
-
-# update the plot with the latest dB values
-def updatePlot():
-    for freq in frequencies:
-        dbValues = dataRTA.get(freq, [-90])
-        dbLatest = dbValues[-1] if dbValues else -90
-        color = 'r' if dbLatest >= -18 else 'y' if -22.5 <= dbLatest < -18 else 'b'
-        if freq in bars:
-            bars[freq].setData([freq, freq], [dbLatest, -90])
-            bars[freq].setPen(pg.mkPen(color, width=3))
-        else:
-            bars[freq] = plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
+# Function to update the plot with the latest dB values
+def update_plot():
+    try:
+        # Get the latest RTA data from the queue if available
+        latest_data = rta_data_queue.get_nowait()
+        
+        # Define thresholds for coloring
+        threshold_80_percent = -18
+        threshold_75_percent = -22.5
+        # Update the plot with the latest dB values
+        for freq in frequencies:
+            dbValues = latest_data.get(freq, [-90])
+            dbLatest = dbValues[-1] if dbValues else -90
+            color = 'r' if dbLatest >= threshold_80_percent else 'y' if threshold_75_percent <= dbLatest < threshold_80_percent else 'b'
+            if freq in bars:
+                bars[freq].setData([freq, freq], [dbLatest, -90])
+                bars[freq].setPen(pg.mkPen(color, width=3))
+            else:
+                bars[freq] = plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
+    except Empty:
+        # If there's no data in the queue, don't update the plot
+        pass
 
 # set logarithmic ticks for the x-axis
 def setLogTicks():
-    # Use logarithmic spacing or pick specific frequencies that are representative
     ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
     tick_labels = [(tick, f"{int(tick)} Hz") for tick in ticks]
     plot.getAxis('bottom').setTicks([tick_labels])
-
 
 if __name__ == "__main__":
     # search mixers on the network
@@ -259,8 +271,6 @@ if __name__ == "__main__":
     # set the mixer IP
     X32IP = chosenIP
     client = SimpleUDPClient(X32IP, 10023)
-
-    setLogTicks()
 
     # argument parser for IP and port
     parser = argparse.ArgumentParser()
@@ -286,9 +296,29 @@ if __name__ == "__main__":
     threadRTASub = threading.Thread(target=subRenewRTA, daemon=True)
     threadRTASub.start()
 
-    timer = QTimer()
-    timer.timeout.connect(updatePlot)
-    timer.start(500)  # Update the plot every second
+    # Initialize the PyQt application
+    app = QApplication([])
+    win = pg.GraphicsLayoutWidget(show=True, title="Real-Time Frequency Response")
+    plot = win.addPlot(title="Frequency Response Histogram")
+    plot.setLogMode(x=True, y=False)
+    plot.setYRange(-90, 0)
+    plot.setLabel('bottom', 'Frequency', units='Hz')
+    plot.setLabel('left', 'dB Value')
 
-    # Start the PyQtGraph Application and OSC server
+    # Initialize bars dictionary to hold the plot data
+    bars = {}
+
+    # Set up logarithmic ticks for the x-axis
+    setLogTicks()
+
+    # Set up timer to update plot periodically
+    timer = QTimer()
+    timer.timeout.connect(update_plot)
+    timer.start(100)  # Update the plot every 500 milliseconds
+
+    # Start a separate thread to run the OSC server
+    osc_server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    osc_server_thread.start()
+
+    # Start the PyQtGraph Application
     sys.exit(app.exec_())
