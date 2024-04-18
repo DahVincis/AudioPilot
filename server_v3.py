@@ -89,12 +89,12 @@ def subRenewRTA():
 gain = 38
 # Initialize dataRTA with all frequencies set to a default list with a placeholder dB value
 dataRTA = {freq: [-90] for freq in frequencies}
-first_rta_received = False
-rta_data_queue = Queue()
+receivedFirstRTA = False
+queueRTA = Queue()
 
 # grabs rta data to process into dB values (102 data points)
 def handlerRTA(address, *args):
-    global first_rta_received
+    global receivedFirstRTA
 
     if not args:
         print(f"No RTA data received on {address}")
@@ -135,11 +135,11 @@ def handlerRTA(address, *args):
         #print(f"{dataRTA}")
 
         # Set the flag to True after receiving the first RTA data
-        if not first_rta_received:
-            first_rta_received = True
+        if not receivedFirstRTA:
+            receivedFirstRTA = True
 
         # Put the received RTA data in the queue
-        rta_data_queue.put(dataRTA)
+        queueRTA.put(dataRTA)
 
     except Exception as e:
         print(f"Error processing RTA data: {e}")
@@ -228,7 +228,7 @@ def handlerDefault(address, *args):
 def update_plot():
     try:
         # Get the latest RTA data from the queue if available
-        latest_data = rta_data_queue.get_nowait()
+        latestData = queueRTA.get_nowait()
         
         # Define thresholds for coloring
         threshUpper = -15
@@ -236,7 +236,7 @@ def update_plot():
         threshLower = -45
         # Update the plot with the latest dB values
         for freq in frequencies:
-            dbValues = latest_data.get(freq, [-90])
+            dbValues = latestData.get(freq, [-90])
             dbLatest = dbValues[-1] if dbValues else -90
             color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'g' if dbLatest >= threshLower <= threshMid else 'b'
             if freq in bars:
@@ -251,8 +251,8 @@ def update_plot():
 # set logarithmic ticks for the x-axis
 def setLogTicks():
     ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
-    tick_labels = [(tick, f"{int(tick)} Hz") for tick in ticks]
-    plot.getAxis('bottom').setTicks([tick_labels])
+    labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
+    plot.getAxis('bottom').setTicks([labelTicks])
 
 if __name__ == "__main__":
     # search mixers on the network
@@ -318,8 +318,8 @@ if __name__ == "__main__":
     timer.start(100)  # Update the plot every 500 milliseconds
 
     # Start a separate thread to run the OSC server
-    osc_server_thread = threading.Thread(target=server.serve_forever, daemon=True)
-    osc_server_thread.start()
+    threadServerOSC = threading.Thread(target=server.serve_forever, daemon=True)
+    threadServerOSC.start()
 
     # Start the PyQtGraph Application
     sys.exit(app.exec_())
