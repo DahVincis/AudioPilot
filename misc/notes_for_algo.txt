@@ -1,4 +1,4 @@
-minimum Q value: 3.0
+minimum Q value: 5.0
 maximum Q value: 1.0
     /ch/[01...32]/eq/[1...4]/q  logf  [10.000, 0.3, 72] 
 

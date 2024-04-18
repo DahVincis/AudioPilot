@@ -130,9 +130,6 @@ def handlerRTA(address, *args):
                     dataRTA[freqLabel].pop(0)
             else:
                 dataRTA[freqLabel] = [dbValue]
-            #print(f"{address} ~ RTA Frequency {freqLabel}Hz: {dbValue} dB")
-
-        #print(f"{dataRTA}")
 
         # Set the flag to True after receiving the first RTA data
         if not receivedFirstRTA:

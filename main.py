@@ -1,4 +1,7 @@
 from server_v3 import dataRTA, frequencies
+from pythonosc.udp_client import SimpleUDPClient
+
+client = SimpleUDPClient('192.168.1.5', 10023)  # Example IP and port
 
 # Define band ranges
 band_ranges = {
@@ -153,36 +156,112 @@ band_ranges = {
         (1.0000, 20000)]
 }
 
+q_values = {
+    5.0: 0.1972,
+    4.8: 0.2113,
+    4.5: 0.2254,
+    4.3: 0.2394,
+    4.1: 0.2535,
+    3.9: 0.2676,
+    3.7: 0.2817,
+    3.5: 0.2958,
+    3.4: 0.3099,
+    3.2: 0.3239,
+    3.1: 0.3380,
+    2.9: 0.3521,
+    2.8: 0.3662,
+    2.6: 0.3803,
+    2.5: 0.3944,
+    2.4: 0.4085,
+    2.3: 0.4225,
+    2.2: 0.4366,
+    2.1: 0.4507,
+    2.0: 0.4648,
+    1.9: 0.4789,
+    1.8: 0.4930,
+    1.7: 0.5070,
+    1.6: 0.5211,
+    1.5: 0.5352,
+    1.4: 0.5634,
+    1.3: 0.5775,
+    1.2: 0.6056,
+    1.1: 0.6338,
+    1.0: 0.6479
+}
+
+def has_sufficient_data(freq):
+    """ Check if there are at least 10 dB values for the frequency. """
+    return len(dataRTA[freq]) >= 10
+
+# Function to find the closest frequency in the hardcoded list to the target frequency
 def find_closest_frequency(target_frequency):
-    """ Find the closest frequency in the hardcoded list to the target frequency. """
     return min(frequencies, key=lambda x: abs(x - target_frequency))
 
 # Mapping each frequency in the band_ranges to the closest in the hardcoded frequencies
-closest_frequencies = {}
-for band, freq_list in band_ranges.items():
-    closest_frequencies[band] = [(osc, find_closest_frequency(freq)) for osc, freq in freq_list]
+closest_frequencies = {band: [(osc, find_closest_frequency(freq)) for osc, freq in freq_list] for band, freq_list in band_ranges.items()}
 
-# Function to find the highest dB frequency in a band
 def find_highest_db_frequency(band):
+    """ Find the frequency with the highest dB value in the band, ensuring enough data points. """
     band_freqs = [freq for _, freq in closest_frequencies[band]]
     highest_db = -90
     highest_freq = None
     for freq in band_freqs:
-        latest_db = dataRTA[freq][-1] if dataRTA[freq] else -90
-        if latest_db > highest_db:
-            highest_db = latest_db
-            highest_freq = freq
+        if has_sufficient_data(freq):
+            latest_db = dataRTA[freq][-1]
+            if latest_db > highest_db:
+                highest_db = latest_db
+                highest_freq = freq
     return highest_freq, highest_db
 
-# Function to calculate gain
-def calculate_gain(db_value):
-    freq_flat = -45  # dB level to achieve flat response
+# Function to calculate gain based on db value, band and vocal type
+def calculate_gain(db_value, band, vocal_type):
+    """ Calculate the gain for a given dB value, band, and vocal type. """
+    freq_flat = -45  # Target dB level for flat response
     distance = db_value - freq_flat
-    return distance / 10  # Simplified gain calculation
+    gain_multipliers = {
+        'Low Pitch': {'Low': 1.0, 'Low Mid': 0.8, 'High Mid': 1.2, 'High': 1.2},
+        'High Pitch': {'Low': 0.8, 'Low Mid': 0.7, 'High Mid': 0.6, 'High': 0.7},
+        'Mid Pitch': {'Low': 0.9, 'Low Mid': 0.85, 'High Mid': 1.1, 'High': 0.9}
+    }
+    band_multiplier = gain_multipliers[vocal_type][band]
+    gain = (distance / 10) * band_multiplier
+    return gain
+
+# Example of processing for a specific band after checking data sufficiency
+band = 'Low'
+vocal_type = 'Low Pitch'
+if all(has_sufficient_data(freq) for _, freq in closest_frequencies[band]):
+    freq, db = find_highest_db_frequency(band)
+    if freq is not None:
+        gain = calculate_gain(db, band, vocal_type)
+        print(f"{vocal_type} - {band} Band Frequency: {freq} Hz, Gain: {gain} dB")
+    else:
+        print(f"Not enough data to process the {band} band yet.")
+else:
+    print(f"Waiting for more data in the {band} band...")
+
+# Example of usage for all bands
+vocal_types = ['Low Pitch', 'High Pitch', 'Mid Pitch']
+for band in band_ranges.keys():
+    freq, db = find_highest_db_frequency(band)
+    for vocal_type in vocal_types:
+        gain = calculate_gain(db, band, vocal_type)
+        print(f"{vocal_type} - {band} Band Frequency: {freq} Hz, Gain: {gain} dB")
 
 # Example of processing the 'Low' band
 low_freq, low_db = find_highest_db_frequency('Low')
-low_gain = calculate_gain(low_db)
+vocal_type = 'Low Pitch'  # This could be dynamically determined or set by the user
+low_gain = calculate_gain(low_db, 'Low', vocal_type)
 print(f"Low Band Frequency: {low_freq} Hz, Gain: {low_gain} dB")
 
-# You can replicate the above example for other bands as needed
+def get_closest_q_osc_value(q_value):
+    """ Return the closest Q OSC float value from the dictionary based on the provided Q value. """
+    closest_q = min(q_values.keys(), key=lambda k: abs(k - q_value))
+    return q_values[closest_q]
+
+def send_q_value(band_number, q_value):
+    """ Send OSC message to change the Q value for a specific band. """
+    osc_address = f'/ch/01/eq/{band_number}/q'
+    osc_value = get_closest_q_osc_value(q_value)
+    client.send_message(osc_address, [osc_value])
+    print(f"Sent OSC message to {osc_address} with Q value {osc_value}")
