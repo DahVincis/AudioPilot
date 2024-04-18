@@ -233,11 +233,12 @@ def update_plot():
         # Define thresholds for coloring
         threshUpper = -15
         threshMid = -30
+        threshLower = -45
         # Update the plot with the latest dB values
         for freq in frequencies:
             dbValues = latest_data.get(freq, [-90])
             dbLatest = dbValues[-1] if dbValues else -90
-            color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'b'
+            color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'g' if dbLatest >= threshLower <= threshMid else 'b'
             if freq in bars:
                 bars[freq].setData([freq, freq], [dbLatest, -90])
                 bars[freq].setPen(pg.mkPen(color, width=3))
