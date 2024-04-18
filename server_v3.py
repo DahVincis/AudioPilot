@@ -232,7 +232,7 @@ def update_plot():
         
         # Define thresholds for coloring
         threshUpper = -15
-        threshMid = -30
+        threshMid = -25
         threshLower = -45
         # Update the plot with the latest dB values
         for freq in frequencies:
