@@ -231,13 +231,13 @@ def update_plot():
         latest_data = rta_data_queue.get_nowait()
         
         # Define thresholds for coloring
-        threshold_80_percent = -18
-        threshold_75_percent = -22.5
+        threshUpper = -15
+        threshMid = -30
         # Update the plot with the latest dB values
         for freq in frequencies:
             dbValues = latest_data.get(freq, [-90])
             dbLatest = dbValues[-1] if dbValues else -90
-            color = 'r' if dbLatest >= threshold_80_percent else 'y' if threshold_75_percent <= dbLatest < threshold_80_percent else 'b'
+            color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'b'
             if freq in bars:
                 bars[freq].setData([freq, freq], [dbLatest, -90])
                 bars[freq].setPen(pg.mkPen(color, width=3))
