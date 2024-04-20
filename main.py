@@ -100,7 +100,7 @@ frequencies = [
 ]
 
 # Define band ranges
-band_ranges = {
+band_ranges = { # band_name: [(freq_id, freq), ...]
     'LowCut': [(0.2600, 120.5)],
     'Low': [(0.2650, 124.7),        # 124.7 to 306.2
         (0.2700, 129.1),
@@ -252,7 +252,7 @@ band_ranges = {
         (1.0000, 20000)]
 }
 
-q_values = {        # 6.4 to 1.0
+q_values = {        # q_value:q_id      6.4 to 1.0
     6.4: 0.1268, 
     6.1: 0.1408, 
     5.8: 0.1549, 
@@ -290,7 +290,7 @@ q_values = {        # 6.4 to 1.0
     1.0: 0.6479
 }
 
-eqGainValues = {    # -15.0 to 15.0
+eqGainValues = {    # gain_value:gain_hexa                  -15.0 to 15.0
     -15.00: 'C1700000',
     -14.75: 'C16C0000',
     -14.50: 'C1680000',
@@ -445,28 +445,37 @@ for freq, db_values in dataRTA.items():
             closest_osc, closest_freq = find_closest_frequency_with_data(freq, band, tolerance=10)
             closest_frequencies[freq][band] = (closest_osc, closest_freq)
 
-# Debug output to check the processing
+""" # Debug output to check the processing
 for freq, band_data in closest_frequencies.items():
     for band, (closest_osc, closest_freq) in band_data.items():
         if closest_freq is not None:
             print(f"DataRTA Freq: {freq}, Band: {band}, Closest Freq ID: {closest_osc}, Frequency: {closest_freq}")
         else:
             print(f"DataRTA Freq: {freq}, Band: {band}, No close frequency with sufficient data")
+ """
 
 def find_highest_db_frequency(band):
     """Find the frequency with the highest dB value in the band, ensuring enough data points."""
-    # Changed to select the id rather than the frequency itself for highest dB.
-    band_ids_and_freqs = closest_frequencies[band]  # This contains tuples of (id, frequency)
-    highest_db = -90
+    highest_db = -90  # Starting point for comparison
     highest_id = None
     highest_freq = None
-    for id, freq in band_ids_and_freqs:
-        if has_sufficient_data(freq):
-            latest_db = dataRTA[freq][-1]
-            if latest_db > highest_db:
-                highest_db = latest_db
-                highest_id = id
-                highest_freq = freq
+
+    # Loop through all frequency entries in closest_frequencies dictionary
+    for freq, band_data in closest_frequencies.items():
+        if band in band_data:  # Check if the current band has data for the freq
+            closest_osc, closest_freq = band_data[band]
+            # Verify that closest_freq has sufficient data
+            if closest_freq in dataRTA and has_sufficient_data(closest_freq):
+                latest_db = dataRTA[closest_freq][-1]
+                if latest_db > highest_db:
+                    highest_db = latest_db
+                    highest_id = closest_osc
+                    highest_freq = closest_freq
+
+    if highest_id is None:
+        print(f"No sufficient data available in the band: {band}")
+        return None, None
+
     return highest_id, highest_db  # Return the id and dB.
 
 def calculate_gain(db_value, band, vocal_type):
@@ -531,9 +540,11 @@ def send_osc_combined_parameters(channel, eq_band, freq_id, gain_value, q_value)
 
 def update_all_bands(vocal_type, channel):
     for band_name, eq_band_number in zip(['Low', 'Low Mid', 'High Mid', 'High'], ['1', '2', '3', '4']):
-        osc_id, freq = find_closest_frequency_with_data(313, band_name)  # Example target frequency
-        if freq is not None and osc_id is not None:
-            db_value = dataRTA[freq][-1]  # Last measured dB value
+        # Find the highest dB frequency and its corresponding id in the current band
+        osc_id, highest_db = find_highest_db_frequency(band_name)
+        if osc_id is not None:
+            freq = [freq for _, freq in band_ranges[band_name] if freq == osc_id][0]  # Match the ID to get the actual frequency
+            db_value = dataRTA[freq][-1]  # Use the latest dB value from the highest dB frequency
             gain = calculate_gain(db_value, band_name, vocal_type)
             q_value = calculate_q_value(band_name, freq)
             q_value = max(min(q_value, 6.4), 1.0)  # Ensure q_value is within the defined range
