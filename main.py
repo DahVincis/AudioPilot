@@ -543,14 +543,18 @@ def update_all_bands(vocal_type, channel):
         # Find the highest dB frequency and its corresponding id in the current band
         osc_id, highest_db = find_highest_db_frequency(band_name)
         if osc_id is not None:
-            freq = [freq for _, freq in band_ranges[band_name] if freq == osc_id][0]  # Match the ID to get the actual frequency
-            db_value = dataRTA[freq][-1]  # Use the latest dB value from the highest dB frequency
-            gain = calculate_gain(db_value, band_name, vocal_type)
-            q_value = calculate_q_value(band_name, freq)
-            q_value = max(min(q_value, 6.4), 1.0)  # Ensure q_value is within the defined range
-            closest_q_osc_value = get_closest_q_osc_value(q_value)  # Get the closest available Q value
-            send_osc_combined_parameters(channel, eq_band_number, osc_id, gain, closest_q_osc_value)
-            print(f"Processed {band_name}: Frequency ID {osc_id}, Gain {gain} dB, Q Value {closest_q_osc_value}")
+            # Since osc_id now correctly maps to the closest frequency id, find that frequency using the id.
+            freq = next((freq for _, freq in band_ranges[band_name] if _ == osc_id), None)
+            if freq:
+                db_value = dataRTA[freq][-1]  # Use the latest dB value from the highest dB frequency
+                gain = calculate_gain(db_value, band_name, vocal_type)
+                q_value = calculate_q_value(band_name, freq)
+                q_value = max(min(q_value, 6.4), 1.0)  # Ensure q_value is within the defined range
+                closest_q_osc_value = get_closest_q_osc_value(q_value)  # Get the closest available Q value
+                send_osc_combined_parameters(channel, eq_band_number, osc_id, gain, closest_q_osc_value)
+                print(f"Processed {band_name}: Frequency ID {osc_id}, Gain {gain} dB, Q Value {closest_q_osc_value}")
+            else:
+                print(f"No matching frequency found for the osc ID {osc_id} in the band: {band_name}")
         else:
             print(f"No sufficient data available to process the {band_name} band.")
 
