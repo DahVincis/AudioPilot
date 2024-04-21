@@ -420,8 +420,7 @@ def has_sufficient_data(freq):
     print(f"Frequency {freq} has {'sufficient' if sufficient else 'insufficient'} data: {len(dataRTA.get(freq, []))} values")
     return sufficient
 
-def find_closest_frequency_with_data(target_frequency, band, tolerance=10):
-    """Finds the closest frequency with sufficient data in the specified band within a tolerance range."""
+def find_closest_frequency_with_data(target_frequency, band, tolerance=5):
     valid_frequencies = [(osc, freq) for osc, freq in band_ranges[band]]
     closest_freq = None
     closest_osc = None
@@ -429,11 +428,16 @@ def find_closest_frequency_with_data(target_frequency, band, tolerance=10):
 
     for osc, freq in valid_frequencies:
         distance = abs(freq - target_frequency)
-        if distance <= tolerance and distance < minimum_distance:
-            closest_freq = freq
-            closest_osc = osc
-            minimum_distance = distance
+        print(f"Checking {freq} with target {target_frequency}, distance {distance}, tolerance {tolerance}")
+        if distance <= tolerance:
+            if freq in dataRTA and has_sufficient_data(freq):
+                if distance < minimum_distance:
+                    closest_freq = freq
+                    closest_osc = osc
+                    minimum_distance = distance
+                    print(f"New closest frequency found: {closest_freq} with OSC {closest_osc}")
 
+    print(f"Closest frequency result for {target_frequency} in band {band}: OSC {closest_osc}, Frequency {closest_freq}")
     return closest_osc, closest_freq
 
 # Adjusting the initialization of closest_frequencies to search based on dataRTA frequencies
@@ -442,8 +446,9 @@ for freq, db_values in dataRTA.items():
     if has_sufficient_data(freq):
         closest_frequencies[freq] = {}
         for band in band_ranges:
-            closest_osc, closest_freq = find_closest_frequency_with_data(freq, band, tolerance=10)
+            closest_osc, closest_freq = find_closest_frequency_with_data(freq, band, tolerance=5 )
             closest_frequencies[freq][band] = (closest_osc, closest_freq)
+print(closest_frequencies)
 
 """ # Debug output to check the processing
 for freq, band_data in closest_frequencies.items():
@@ -457,26 +462,26 @@ for freq, band_data in closest_frequencies.items():
 def find_highest_db_frequency(band):
     """Find the frequency with the highest dB value in the band, ensuring enough data points."""
     highest_db = -90  # Starting point for comparison
-    highest_id = None
     highest_freq = None
+    highest_id = None
 
-    # Loop through all frequency entries in closest_frequencies dictionary
-    for freq, band_data in closest_frequencies.items():
-        if band in band_data:  # Check if the current band has data for the freq
-            closest_osc, closest_freq = band_data[band]
-            # Verify that closest_freq has sufficient data
-            if closest_freq in dataRTA and has_sufficient_data(closest_freq):
-                latest_db = dataRTA[closest_freq][-1]
+    # Iterate over each entry in closest_frequencies, which should already be filtered to valid frequencies
+    for freq, data in closest_frequencies.items():
+        if band in data:
+            osc_id, freq_data = data[band]
+            # Checking each frequency's latest dB value
+            if freq_data in dataRTA and has_sufficient_data(freq_data):
+                latest_db = max(dataRTA[freq_data])  # Use the max dB value from the dataRTA
                 if latest_db > highest_db:
                     highest_db = latest_db
-                    highest_id = closest_osc
-                    highest_freq = closest_freq
+                    highest_freq = freq_data
+                    highest_id = osc_id
 
-    if highest_id is None:
+    if highest_freq is None:
         print(f"No sufficient data available in the band: {band}")
         return None, None
 
-    return highest_id, highest_db  # Return the id and dB.
+    return highest_id, highest_db
 
 def calculate_gain(db_value, band, vocal_type):
     """Calculate the gain for a given dB value, band, and vocal type."""
@@ -540,23 +545,25 @@ def send_osc_combined_parameters(channel, eq_band, freq_id, gain_value, q_value)
 
 def update_all_bands(vocal_type, channel):
     for band_name, eq_band_number in zip(['Low', 'Low Mid', 'High Mid', 'High'], ['1', '2', '3', '4']):
-        # Find the highest dB frequency and its corresponding id in the current band
         osc_id, highest_db = find_highest_db_frequency(band_name)
         if osc_id is not None:
-            # Since osc_id now correctly maps to the closest frequency id, find that frequency using the id.
+            # Since osc_id is found, find that frequency using the ID.
             freq = next((freq for _, freq in band_ranges[band_name] if _ == osc_id), None)
-            if freq:
-                db_value = dataRTA[freq][-1]  # Use the latest dB value from the highest dB frequency
+            if freq and freq in dataRTA:
+                db_value = max(dataRTA[freq])  # Use the max dB value from the correct frequency
                 gain = calculate_gain(db_value, band_name, vocal_type)
                 q_value = calculate_q_value(band_name, freq)
-                q_value = max(min(q_value, 6.4), 1.0)  # Ensure q_value is within the defined range
-                closest_q_osc_value = get_closest_q_osc_value(q_value)  # Get the closest available Q value
-                send_osc_combined_parameters(channel, eq_band_number, osc_id, gain, closest_q_osc_value)
-                print(f"Processed {band_name}: Frequency ID {osc_id}, Gain {gain} dB, Q Value {closest_q_osc_value}")
+                if q_value is not None:
+                    q_osc_value = get_closest_q_osc_value(q_value)
+                    send_osc_combined_parameters(channel, eq_band_number, osc_id, gain, q_osc_value)
+                    print(f"Processed {band_name}: Frequency ID {osc_id}, Gain {gain} dB, Q Value {q_value}")
+                else:
+                    print(f"Could not calculate a valid Q value for frequency {freq} in band {band_name}")
             else:
-                print(f"No matching frequency found for the osc ID {osc_id} in the band: {band_name}")
+                print(f"No valid frequency found for OSC ID {osc_id} in band {band_name}")
         else:
             print(f"No sufficient data available to process the {band_name} band.")
+
 
 if __name__ == "__main__":
     print("Select the vocal type:")
