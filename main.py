@@ -459,29 +459,27 @@ def calculate_gain(db_value, band, vocal_type):
     return round(gain, 2)
 
 def calculate_q_value(band, freq):
-    """Calculate the Q value based on adjacent frequencies, ensuring the highest dB frequency is considered."""
-    if freq not in dataRTA:
-        print(f"Frequency {freq} not found in dataRTA for band {band}")
+    if freq not in dataRTA or not dataRTA[freq]:
+        print(f"Frequency {freq} has no data in dataRTA for band {band}")
         return None  # Early exit if the frequency data is not available
 
-    frequencies = [f for _, f in band_ranges[band]]
+    frequencies = [f for _, f in band_ranges.get(band, [])]
     if freq not in frequencies:
         print(f"Selected frequency {freq} not found in {band} band range.")
-        return None  # Return None if frequency is not in band ranges
+        return None
 
     freq_index = frequencies.index(freq)
-    # Ensure to check the existence of frequency in dataRTA and take the latest dB value
-    freq_db_values = [dataRTA[f][-1] for f in frequencies if f in dataRTA]
-    selected_db = dataRTA[freq][-1]
+    freq_db_values = [dataRTA.get(f, [-float('inf')])[-1] for f in frequencies]
+    selected_db = max(dataRTA.get(freq, [float('-inf')]))
     min_q_value = 6.4
     max_q_value = 1.0
     band_size = len(freq_db_values)
+    if band_size == 0:
+        return None
 
-    # Calculate adjacent values within 20 dB range of the highest dB value
-    adjacent_values_count = sum(1 for db in freq_db_values[max(0, freq_index - 1): min(freq_index + 2, band_size)]
+    adjacent_values_count = sum(1 for db in freq_db_values[max(0, freq_index - 1):min(freq_index + 2, band_size)]
                                 if selected_db - 20 <= db <= selected_db + 20)
 
-    # Calculate the Q value, adjust based on the count of adjacent frequencies within 20 dB range
     q_value = min_q_value - (adjacent_values_count * ((min_q_value - max_q_value) / max(band_size, 1)))
     return q_value
 
@@ -545,8 +543,6 @@ def update_all_bands(vocal_type, channel):
                         send_osc_combined_parameters(channel, eq_band_numbers[band_name], closest_id, gain_hex, q_osc_value)
                         print(f"Processed {band_name}: Frequency ID {closest_id}, Gain {gain_hex}, Q Value {q_osc_value}")
 
-
-
 if __name__ == "__main__":
     print("Select the vocal type:")
     print("1. Low Pitch")
@@ -561,8 +557,13 @@ if __name__ == "__main__":
         print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
         vocal_type = 'Mid Pitch'
 
-    channel = get_valid_channel()  # Get a valid channel number
+    channel = get_valid_channel()  # Get a valid channel number from the user
 
-    while True:
-        update_all_bands(vocal_type, channel)
-        time.sleep(1)  # Adjustable based on system capabilities and needs
+    print(f"Updating bands for vocal type {vocal_type} on channel {channel}...")
+    try:
+        while True:
+            update_all_bands(vocal_type, channel)
+            print("Waiting for next update cycle...")
+            time.sleep(10)  # Pause 10 seconds between updates
+    except KeyboardInterrupt:
+        print("Updates stopped by user.")

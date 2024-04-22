@@ -416,7 +416,189 @@ eqGainValues = {    # gain_value:gain_hexa                  -15.0 to 15.0
     15.00: '41700000'
 }
 
+bands_range_RTA = {
+    'Low': (118, 292),
+    'Low Mid': (313, 1090),
+    'High Mid': (1170, 5000),
+    'High': (5360, 18660)
+}
 
 def has_sufficient_data(freq):
     """Check if there are at least 10 dB values for the frequency."""
     return len(dataRTA.get(freq, [])) >= 10
+
+def find_highest_freq_in_band(band_name):
+    band_range = bands_range_RTA.get(band_name)
+    if not band_range:
+        return None  # or raise an error if preferred
+
+    lower_bound, upper_bound = band_range
+    max_db = float('-inf')
+    max_freq = None
+
+    for freq, db_values in dataRTA.items():
+        if lower_bound <= freq <= upper_bound:
+            current_max_db = max(db_values)
+            if current_max_db > max_db:
+                max_db = current_max_db
+                max_freq = freq
+
+    return max_freq
+
+def find_highest_db_in_band(band_name):
+    band_range = bands_range_RTA.get(band_name)
+    if not band_range:
+        return None  # or raise an error if preferred
+
+    lower_bound, upper_bound = band_range
+    max_db = float('-inf')
+
+    for freq, db_values in dataRTA.items():
+        if lower_bound <= freq <= upper_bound:
+            current_max_db = max(db_values)
+            if current_max_db > max_db:
+                max_db = current_max_db
+
+    return max_db
+
+def find_closest_frequency(band_name, target_frequency):
+    frequencies = band_ranges.get(band_name, [])
+    if not frequencies or target_frequency is None:
+        return None  # Proper handling when no frequencies or target frequency is None
+    
+    # Find the closest frequency and its ID
+    closest_freq_data = min(frequencies, key=lambda x: abs(x[1] - target_frequency))
+    return closest_freq_data  # This now returns the tuple (freq_id, frequency)
+
+def calculate_gain(db_value, band, vocal_type):
+    # Define gain multipliers for different vocal types and bands
+    gain_multipliers = {
+        'Low Pitch': {'Low': 1.0, 'Low Mid': 0.8, 'High Mid': 1.2, 'High': 1.2},
+        'High Pitch': {'Low': 0.8, 'Low Mid': 0.7, 'High Mid': 0.6, 'High': 0.7},
+        'Mid Pitch': {'Low': 0.9, 'Low Mid': 0.85, 'High Mid': 1.1, 'High': 0.9}
+    }
+
+    # Define the target dB level for flat response
+    freq_flat = -45
+
+    # Calculate the distance from the frequency dB to the flat level
+    distance = db_value - freq_flat
+
+    # Get the multiplier based on vocal type and band
+    band_multiplier = gain_multipliers.get(vocal_type, {}).get(band, 1)
+
+    # Calculate the gain
+    gain = (distance / 10) * band_multiplier
+
+    return round(gain, 2)
+
+def calculate_q_value(freq, band):
+    # Parameters for each band
+    q_limits = {
+        'Low': (3.0, 7.0),
+        'Low Mid': (2.5, 6.0),
+        'High Mid': (2.0, 5.5),
+        'High': (1.5, 4.5)
+    }
+
+    if band not in band_ranges or band not in q_limits:
+        return None
+
+    frequencies = [f[1] for f in band_ranges[band]]
+    band_size = len(frequencies)
+    q_max, q_min = q_limits[band]
+    q_lim = q_max - q_min
+
+    # Get dB values for the selected frequency
+    db_value = max(dataRTA.get(freq, []))
+    # Count frequencies within the same dB range (-/+ 20 dB)
+    freq_size = sum(1 for f in frequencies if f in dataRTA and any(abs(db_value - db) <= 20 for db in dataRTA[f]))
+
+    # Calculate the Q value
+    q_value = freq_size * (q_lim / band_size)
+
+    return round(q_value + q_min, 2)
+
+def get_closest_q_osc_value(q_value):
+    """Return the closest Q OSC float value from the dictionary based on the provided Q value."""
+    if not q_values:  # Check if q_values is empty or undefined
+        return None
+    closest_q = min(q_values.keys(), key=lambda k: abs(k - q_value))
+    return q_values[closest_q]
+
+
+def get_closest_gain_hex(gain_value):
+    """Return the closest gain hexadecimal value from the dictionary based on the provided gain value."""
+    if not eqGainValues:  # Check if eqGainValues is empty or undefined
+        return None
+    # Ensure gain_value is float for comparison
+    gain_value = float(gain_value)
+    closest_gain = min(eqGainValues.keys(), key=lambda k: abs(k - gain_value))
+    return eqGainValues[closest_gain]
+
+def get_valid_channel():
+    while True:
+        channel = input("Enter the channel number from 01 to 32: ")
+        if channel.isdigit() and 1 <= int(channel) <= 32:
+            return channel.zfill(2)  # Ensures the channel number is formatted with two digits
+        else:
+            print("Invalid input. Please enter a number from 01 to 32.")
+
+def send_osc_combined_parameters(channel, eq_band, freq_id, gain_value, q_value):
+    """Send OSC message with all EQ parameters in one command, using frequency id."""
+    gain_hex = get_closest_gain_hex(gain_value)
+    q_osc_value = get_closest_q_osc_value(q_value)
+    formatted_freq_id = round(freq_id, 4)  # Ensure it's a float with four decimal places
+    client.send_message(f'/ch/{channel}/eq/{eq_band}', [2, formatted_freq_id, gain_hex, q_osc_value])
+    print(f"Sent OSC message to /ch/{channel}/eq/{eq_band} with parameters: Type 2, Frequency ID {formatted_freq_id}, Gain {gain_hex}, Q {q_osc_value}")
+
+def update_all_bands(vocal_type, channel):
+    bands = ['Low', 'Low Mid', 'High Mid', 'High']
+    
+    for band in bands:
+        highest_freq = find_highest_freq_in_band(band)
+        if highest_freq is None:
+            print(f"No data for band {band}. Skipping...")
+            continue
+        
+        highest_db = find_highest_db_in_band(band)
+        closest_freq_data = find_closest_frequency(band, highest_freq)
+        if closest_freq_data is None:
+            print(f"No closest frequency found for band {band}. Skipping...")
+            continue
+        
+        freq_id, actual_freq = closest_freq_data
+        gain_value = calculate_gain(highest_db, band, vocal_type)
+        q_value = calculate_q_value(highest_freq, band)
+        
+        gain_hex = get_closest_gain_hex(gain_value)
+        q_osc_value = get_closest_q_osc_value(q_value)
+        
+        # Send combined parameters via OSC
+        send_osc_combined_parameters(channel, band, freq_id, gain_hex, q_osc_value)
+        print(f"Updated {band} band for channel {channel}: Gain {gain_hex}, Q {q_osc_value}, Freq ID {freq_id}")
+
+if __name__ == "__main__":
+    print("Select the vocal type:")
+    print("1. Low Pitch")
+    print("2. High Pitch")
+    print("3. Mid Pitch (Flat)")
+
+    try:
+        vocal_type_input = int(input("Enter the number for the desired vocal type: "))
+        vocal_types = ['Low Pitch', 'High Pitch', 'Mid Pitch']
+        vocal_type = vocal_types[vocal_type_input - 1]  # Adjust index for zero-based
+    except (IndexError, ValueError):
+        print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
+        vocal_type = 'Mid Pitch'
+
+    channel = get_valid_channel()  # Get a valid channel number from the user
+
+    print(f"Updating bands for vocal type {vocal_type} on channel {channel}...")
+    try:
+        while True:
+            update_all_bands(vocal_type, channel)
+            print("Waiting for next update cycle...")
+            time.sleep(1)  # Pause 10 seconds between updates
+    except KeyboardInterrupt:
+        print("Updates stopped by user.")
