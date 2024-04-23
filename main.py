@@ -468,7 +468,7 @@ def findClosestFrequency(bandName, targetFreq):
     
     # Find the closest frequency and its ID
     closeFreqData = min(frequencies, key=lambda x: abs(x[1] - targetFreq))
-    return closeFreqData  # This now returns the tuple (freq_id, frequency)
+    return closeFreqData  # This now returns the tuple (freqID, frequency)
 
 def calculateGain(dbValue, band, vocalType):
     # Define gain multipliers for different vocal types and bands
@@ -521,7 +521,7 @@ def calculateQValue(freq, band):
 
 def getClosestQIDValue(qValue):
     """Return the closest Q OSC float value from the dictionary based on the provided Q value."""
-    if not qValues:  # Check if q_values is empty or undefined
+    if not qValues:  # Check if qValues is empty or undefined
         return None
     closestQ = min(qValues.keys(), key=lambda k: abs(k - qValue))
     return qValues[closestQ]
