@@ -544,10 +544,8 @@ def get_valid_channel():
         else:
             print("Invalid input. Please enter a number from 01 to 32.")
 
-def send_osc_combined_parameters(channel, eq_band, freq_id, gain_value, q_value):
+def send_osc_combined_parameters(channel, eq_band, freq_id, gain_hex, q_osc_value):
     """Send OSC message with all EQ parameters in one command, using frequency id."""
-    gain_hex = get_closest_gain_hex(gain_value)
-    q_osc_value = get_closest_q_osc_value(q_value)
     formatted_freq_id = round(freq_id, 4)  # Ensure it's a float with four decimal places
     client.send_message(f'/ch/{channel}/eq/{eq_band}', [2, formatted_freq_id, gain_hex, q_osc_value])
     print(f"Sent OSC message to /ch/{channel}/eq/{eq_band} with parameters: Type 2, Frequency ID {formatted_freq_id}, Gain {gain_hex}, Q {q_osc_value}")
