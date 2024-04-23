@@ -1,32 +1,12 @@
-from pythonosc.dispatcher import Dispatcher
-from pythonosc.osc_server import ThreadingOSCUDPServer
-from pythonosc.udp_client import SimpleUDPClient
-import argparse
 import time
-import threading
 import struct
 import select
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
 import numpy as np
 from queue import Queue, Empty
-
-# hardcoded frequencies based on /meters/15 data
-frequencies = [
-    20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
-    39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
-    78, 84, 90, 96, 103, 110, 118, 127, 136, 146,
-    156, 167, 179, 192, 206, 221, 237, 254, 272, 292,
-    313, 335, 359, 385, 412, 442, 474, 508, 544, 583,
-    625, 670, 718, 769, 825, 884, 947, 1020, 1090, 1170,
-    1250, 1340, 1440, 1540, 1650, 1770, 1890, 2030, 2180, 2330,
-    2500, 2680, 2870, 3080, 3300, 3540, 3790, 4060, 4350, 4670,
-    5000, 5360, 5740, 6160, 6600, 7070, 7580, 8120, 8710, 9330,
-    10000, 10720, 11490, 12310, 13200, 14140, 15160, 16250, 17410, 18660
-]
+from Data import dataRTA, frequencies, gainOffest
+from AudioPilot import bars, plot, client, SimpleUDPClient
 
 # check a single IP for a mixer
 def checkMixerIP(ip, port):
@@ -85,10 +65,6 @@ def subRenewRTA():
         client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99]) # 80 indicates 3 updates, see page 17 of o32-osc.pdf
         time.sleep(0.1)  # renew just before the 10-second timeout
 
-# offest for dB values
-gain = 38
-# Initialize dataRTA with all frequencies set to a default list with a placeholder dB value
-dataRTA = {freq: [-90] for freq in frequencies}
 receivedFirstRTA = False
 queueRTA = Queue()
 
@@ -115,8 +91,8 @@ def handlerRTA(address, *args):
             if shortINT1 >= 0x8000: shortINT1 -= 0x10000
             if shortINT2 >= 0x8000: shortINT2 -= 0x10000
             # convert to dB values
-            dbValue1 = (shortINT1 / 256.0) + gain
-            dbValue2 = (shortINT2 / 256.0) + gain
+            dbValue1 = (shortINT1 / 256.0) + gainOffest
+            dbValue2 = (shortINT2 / 256.0) + gainOffest
             dbValues.append(dbValue1)
             dbValues.append(dbValue2)
 
@@ -222,7 +198,7 @@ def handlerDefault(address, *args):
     print(f"Received fader message on {address}. Args: {args}")
 
 # Function to update the plot with the latest dB values
-def update_plot():
+def updatePlot():
     try:
         # Get the latest RTA data from the queue if available
         latestData = queueRTA.get_nowait()
@@ -250,73 +226,3 @@ def setLogTicks():
     ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
     labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
     plot.getAxis('bottom').setTicks([labelTicks])
-
-if __name__ == "__main__":
-    # search mixers on the network
-    mixers = discMixers()
-    if not mixers:
-        print("No mixers found.")
-        exit()
-
-    # options for user
-    for idx, (ip, details) in enumerate(mixers.items(), start=1):
-        print(f"{idx}: Mixer at IP {ip} with details: {details}")
-
-    # user selects mixer
-    chosen = int(input("Select the number for the desired mixer: ")) - 1
-    chosenIP = list(mixers.keys())[chosen]
-
-    # set the mixer IP
-    X32IP = chosenIP
-    client = SimpleUDPClient(X32IP, 10023)
-
-    # argument parser for IP and port
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--ip", default="0.0.0.0", help="The ip to listen on")
-    parser.add_argument("--port", type=int, default=10024, help="The port to listen on")
-    args = parser.parse_args()
-
-    # map handlers to OSC addresses
-    dispatcher = Dispatcher()
-    dispatcher.map("/meters", handlerRTA)
-    dispatcher.map("/*/*/mix/fader", handlerFader)
-    dispatcher.map("/*/*/preamp/trim", handlerPreampTrim)
-    dispatcher.set_default_handler(handlerDefault)
-
-    server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
-    print(f"Serving on {server.server_address}")
-    client._sock = server.socket
-
-    # start threads for keep alive and RTA subscription
-    threadKeepAlive = threading.Thread(target=keepMixerAwake, daemon=True)
-    threadKeepAlive.start()
-
-    threadRTASub = threading.Thread(target=subRenewRTA, daemon=True)
-    threadRTASub.start()
-
-    # Initialize the PyQt application
-    app = QApplication([])
-    win = pg.GraphicsLayoutWidget(show=True, title="Real-Time Frequency Response")
-    plot = win.addPlot(title="Frequency Response Histogram")
-    plot.setLogMode(x=True, y=False)
-    plot.setYRange(-90, 0)
-    plot.setLabel('bottom', 'Frequency', units='Hz')
-    plot.setLabel('left', 'dB Value')
-
-    # Initialize bars dictionary to hold the plot data
-    bars = {}
-
-    # Set up logarithmic ticks for the x-axis
-    setLogTicks()
-
-    # Set up timer to update plot periodically
-    timer = QTimer()
-    timer.timeout.connect(update_plot)
-    timer.start(100)  # Update the plot every 500 milliseconds
-
-    # Start a separate thread to run the OSC server
-    threadServerOSC = threading.Thread(target=server.serve_forever, daemon=True)
-    threadServerOSC.start()
-
-    # Start the PyQtGraph Application
-    sys.exit(app.exec_())
