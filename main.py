@@ -102,7 +102,7 @@ dataRTA = {
     5000: [-40.296875, -16.6171875, -25.3046875, -16.9765625, -36.015625, -27.390625, -25.9921875, -35.96875, -19.625, -26.375], 5360: [-47.9765625, -13.671875, -21.6953125, -13.0546875, -32.09375, -29.375, -25.671875, -40.71875, -21.7421875, -25.3203125], 5740: [-49.515625, -16.671875, -26.78125, -19.53125, -38.5703125, -28.515625, -27.546875, -43.7265625, -31.3671875, -27.34375], 6160: [-50.65625, -21.625, -23.8515625, -16.1875, -35.2265625, -28.15625, -30.2734375, -39.953125, -27.0234375, -28.40625], 6600: [-52.6484375, -16.703125, -26.5546875, -17.8515625, -36.8125, -28.9453125, -28.984375, -36.53125, -22.640625, -26.8984375], 7070: [-51.6953125, -14.953125, -22.703125, -19.2421875, -38.203125, -28.3515625, -27.03125, -42.109375, -27.7578125, -29.53125], 7580: [-48.046875, -24.5390625, -19.609375, -22.03125, -40.9921875, -30.5390625, -24.4921875, -43.5859375, -25.484375, -24.2109375], 8120: [-45.7265625, -21.984375, -18.3984375, -23.84375, -42.8046875, -30.1796875, -24.2578125, -43.3046875, -24.1484375, -24.0390625], 8710: [-49.28125, -24.390625, -17.578125, -20.671875, -39.6328125, -34.3046875, -25.90625, -41.1953125, -21.6796875, -23.875], 9330: [-50.515625, -21.6953125, -17.5390625, -22.171875, -41.1328125, -31.59375, -22.7734375, -42.6875, -29.265625, -26.7109375], 10000: [-50.578125, -19.4140625, -24.2578125, -22.5859375, -41.5546875, -30.59375, -29.265625, -46.3125, -30.3828125, -26.6875], 10720: [-52.8125, -25.2890625, -26.5546875, -24.6328125, -43.6015625, -30.8984375, -33.203125, -49.7265625, -35.140625, -31.5390625], 11490: [-61.6171875, -37.828125, -32.078125, -33.3828125, -52.3515625, -34.65625, -40.421875, -49.5, -40.484375, -40.0], 12310: [-66.3984375, -35.3203125, -36.34375, -31.2421875, -50.2109375, -36.0390625, -41.9921875, -49.7578125, -46.5, -43.703125], 13200: [-72.0625, -44.5234375, -44.125, -40.453125, -59.4296875, -45.546875, -46.7578125, -54.25, -51.109375, -50.4140625], 14140: [-76.921875, -49.765625, -53.28125, -45.703125, -64.671875, -49.09375, -55.953125, -55.5, -60.265625, -57.5], 15160: [-72.859375, -52.984375, -49.7265625, -51.6796875, -70.6484375, -53.0625, -61.578125, -66.296875, -61.703125, -65.1640625], 16250: [-75.46875, -62.765625, -60.8359375, -61.578125, -77.3984375, -58.9765625, -68.9296875, -65.8359375, -65.75, -67.9296875], 17410: [-76.25, -65.1015625, -63.1875, -63.484375, -77.734375, -65.671875, -69.296875, -64.0703125, -66.921875, -68.9609375], 18660: [-75.3203125, -63.9609375, -65.953125, -66.7265625, -76.453125, -67.3125, -70.6328125, -64.1796875, -67.1328125, -71.2734375]}
 
 # Define band ranges
-band_ranges = { # band_name: [(freq_id, freq), ...]
+bandRanges = { # band_name: [(freq_id, freq), ...]
 #    'LowCut': [(0.2600, 120.5)],
     'Low': [(0.2650, 124.7),        # 124.7 to 306.2
         (0.2700, 129.1),
@@ -254,7 +254,7 @@ band_ranges = { # band_name: [(freq_id, freq), ...]
         (1.0000, 20000)]
 }
 
-q_values = {        # q_value:q_id      6.4 to 1.0
+qValues = {        # q_value:q_id      6.4 to 1.0
     6.4: 0.1268, 
     6.1: 0.1408, 
     5.8: 0.1549, 
@@ -416,127 +416,127 @@ eqGainValues = {    # gain_value:gain_hexa                  -15.0 to 15.0
     15.00: '41700000'
 }
 
-bands_range_RTA = {
+bandsRangeRTA = {
     'Low': (118, 292),
     'Low Mid': (313, 1090),
     'High Mid': (1170, 5000),
     'High': (5360, 18660)
 }
 
-def has_sufficient_data(freq):
+def hasSufficientData(freq):
     """Check if there are at least 10 dB values for the frequency."""
     return len(dataRTA.get(freq, [])) >= 10
 
-def find_highest_freq_in_band(band_name):
-    band_range = bands_range_RTA.get(band_name)
-    if not band_range:
+def findHighestFreqinBand(bandName):
+    bandRange = bandsRangeRTA.get(bandName)
+    if not bandRange:
         return None  # or raise an error if preferred
 
-    lower_bound, upper_bound = band_range
-    max_db = float('-inf')
-    max_freq = None
+    lowBound, upBound = bandRange
+    maxDB = float('-inf')
+    maxFreq = None
 
-    for freq, db_values in dataRTA.items():
-        if lower_bound <= freq <= upper_bound:
-            current_max_db = max(db_values)
-            if current_max_db > max_db:
-                max_db = current_max_db
-                max_freq = freq
+    for freq, dbValues in dataRTA.items():
+        if lowBound <= freq <= upBound:
+            currentMaxDB = max(dbValues)
+            if currentMaxDB > maxDB:
+                maxDB = currentMaxDB
+                maxFreq = freq
 
-    return max_freq
+    return maxFreq
 
-def find_highest_db_in_band(band_name):
-    band_range = bands_range_RTA.get(band_name)
-    if not band_range:
+def findHighestDBinBand(bandName):
+    bandRange = bandsRangeRTA.get(bandName)
+    if not bandRange:
         return None  # or raise an error if preferred
 
-    lower_bound, upper_bound = band_range
-    max_db = float('-inf')
+    lowBound, upBound = bandRange
+    maxDB = float('-inf')
 
-    for freq, db_values in dataRTA.items():
-        if lower_bound <= freq <= upper_bound:
-            current_max_db = max(db_values)
-            if current_max_db > max_db:
-                max_db = current_max_db
+    for freq, dbValues in dataRTA.items():
+        if lowBound <= freq <= upBound:
+            currentMaxDB = max(dbValues)
+            if currentMaxDB > maxDB:
+                maxDB = currentMaxDB
 
-    return max_db
+    return maxDB
 
-def find_closest_frequency(band_name, target_frequency):
-    frequencies = band_ranges.get(band_name, [])
-    if not frequencies or target_frequency is None:
+def findClosestFrequency(bandName, targetFreq):
+    frequencies = bandRanges.get(bandName, [])
+    if not frequencies or targetFreq is None:
         return None  # Proper handling when no frequencies or target frequency is None
     
     # Find the closest frequency and its ID
-    closest_freq_data = min(frequencies, key=lambda x: abs(x[1] - target_frequency))
-    return closest_freq_data  # This now returns the tuple (freq_id, frequency)
+    closeFreqData = min(frequencies, key=lambda x: abs(x[1] - targetFreq))
+    return closeFreqData  # This now returns the tuple (freq_id, frequency)
 
-def calculate_gain(db_value, band, vocal_type):
+def calculateGain(dbValue, band, vocalType):
     # Define gain multipliers for different vocal types and bands
-    gain_multipliers = {
+    gainMultis = {
         'Low Pitch': {'Low': 1.0, 'Low Mid': 0.8, 'High Mid': 1.2, 'High': 1.2},
         'High Pitch': {'Low': 0.8, 'Low Mid': 0.7, 'High Mid': 0.6, 'High': 0.7},
         'Mid Pitch': {'Low': 0.9, 'Low Mid': 0.85, 'High Mid': 1.1, 'High': 0.9}
     }
 
     # Define the target dB level for flat response
-    freq_flat = -45
+    freqFlat = -45
 
     # Calculate the distance from the frequency dB to the flat level
-    distance = db_value - freq_flat
+    distance = dbValue - freqFlat
 
     # Get the multiplier based on vocal type and band
-    band_multiplier = gain_multipliers.get(vocal_type, {}).get(band, 1)
+    bandMulti = gainMultis.get(vocalType, {}).get(band, 1)
 
     # Calculate the gain
-    gain = (distance / 10) * band_multiplier
+    gain = (distance / 10) * bandMulti
 
     return round(gain, 2)
 
-def calculate_q_value(freq, band):
+def calculateQValue(freq, band):
     # Parameters for each band
-    q_limits = {
+    qLimits = {
         'Low': (3.0, 7.0),
         'Low Mid': (2.5, 6.0),
         'High Mid': (2.0, 5.5),
         'High': (1.5, 4.5)
     }
 
-    if band not in band_ranges or band not in q_limits:
+    if band not in bandRanges or band not in qLimits:
         return None
 
-    frequencies = [f[1] for f in band_ranges[band]]
-    band_size = len(frequencies)
-    q_max, q_min = q_limits[band]
-    q_lim = q_max - q_min
+    frequencies = [f[1] for f in bandRanges[band]]
+    bandSize = len(frequencies)
+    qMax, qMin = qLimits[band]
+    qLim = qMax - qMin
 
     # Get dB values for the selected frequency
-    db_value = max(dataRTA.get(freq, []))
+    dbValue = max(dataRTA.get(freq, []))
     # Count frequencies within the same dB range (-/+ 20 dB)
-    freq_size = sum(1 for f in frequencies if f in dataRTA and any(abs(db_value - db) <= 20 for db in dataRTA[f]))
+    freqSize = sum(1 for f in frequencies if f in dataRTA and any(abs(dbValue - db) <= 20 for db in dataRTA[f]))
 
     # Calculate the Q value
-    q_value = freq_size * (q_lim / band_size)
+    qValue = freqSize * (qLim / bandSize)
 
-    return round(q_value + q_min, 2)
+    return round(qValue + qMin, 2)
 
-def get_closest_q_osc_value(q_value):
+def getClosestQIDValue(qValue):
     """Return the closest Q OSC float value from the dictionary based on the provided Q value."""
-    if not q_values:  # Check if q_values is empty or undefined
+    if not qValues:  # Check if q_values is empty or undefined
         return None
-    closest_q = min(q_values.keys(), key=lambda k: abs(k - q_value))
-    return q_values[closest_q]
+    closestQ = min(qValues.keys(), key=lambda k: abs(k - qValue))
+    return qValues[closestQ]
 
 
-def get_closest_gain_hex(gain_value):
+def getClosestGainHex(gainValue):
     """Return the closest gain hexadecimal value from the dictionary based on the provided gain value."""
     if not eqGainValues:  # Check if eqGainValues is empty or undefined
         return None
     # Ensure gain_value is float for comparison
-    gain_value = float(gain_value)
-    closest_gain = min(eqGainValues.keys(), key=lambda k: abs(k - gain_value))
-    return eqGainValues[closest_gain]
+    gainValue = float(gainValue)
+    closestGain = min(eqGainValues.keys(), key=lambda k: abs(k - gainValue))
+    return eqGainValues[closestGain]
 
-def get_valid_channel():
+def getValidChannel():
     while True:
         channel = input("Enter the channel number from 01 to 32: ")
         if channel.isdigit() and 1 <= int(channel) <= 32:
@@ -544,37 +544,37 @@ def get_valid_channel():
         else:
             print("Invalid input. Please enter a number from 01 to 32.")
 
-def send_osc_combined_parameters(channel, eq_band, freq_id, gain_hex, q_osc_value):
+def sendOSCParameters(channel, eqBand, freqID, gainHex, qIDValue):
     """Send OSC message with all EQ parameters in one command, using frequency id."""
-    formatted_freq_id = round(freq_id, 4)  # Ensure it's a float with four decimal places
-    client.send_message(f'/ch/{channel}/eq/{eq_band}', [2, formatted_freq_id, gain_hex, q_osc_value])
-    print(f"Sent OSC message to /ch/{channel}/eq/{eq_band} with parameters: Type 2, Frequency ID {formatted_freq_id}, Gain {gain_hex}, Q {q_osc_value}")
+    formatFreqID = round(freqID, 4)  # Ensure it's a float with four decimal places
+    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, formatFreqID, gainHex, qIDValue])
+    print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {formatFreqID}, Gain {gainHex}, Q {qIDValue}")
 
-def update_all_bands(vocal_type, channel):
+def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
     
     for band in bands:
-        highest_freq = find_highest_freq_in_band(band)
-        if highest_freq is None:
+        highestFreq = findHighestFreqinBand(band)
+        if highestFreq is None:
             print(f"No data for band {band}. Skipping...")
             continue
         
-        highest_db = find_highest_db_in_band(band)
-        closest_freq_data = find_closest_frequency(band, highest_freq)
-        if closest_freq_data is None:
+        highestDB = findHighestDBinBand(band)
+        closestFreqData = findClosestFrequency(band, highestFreq)
+        if closestFreqData is None:
             print(f"No closest frequency found for band {band}. Skipping...")
             continue
         
-        freq_id, actual_freq = closest_freq_data
-        gain_value = calculate_gain(highest_db, band, vocal_type)
-        q_value = calculate_q_value(highest_freq, band)
+        freqID, actualFreq = closestFreqData
+        gainValue = calculateGain(highestDB, band, vocalType)
+        qValue = calculateQValue(highestFreq, band)
         
-        gain_hex = get_closest_gain_hex(gain_value)
-        q_osc_value = get_closest_q_osc_value(q_value)
+        gainHex = getClosestGainHex(gainValue)
+        qIDValue = getClosestQIDValue(qValue)
         
         # Send combined parameters via OSC
-        send_osc_combined_parameters(channel, band, freq_id, gain_hex, q_osc_value)
-        print(f"Updated {band} band for channel {channel}: Gain {gain_hex}, Q {q_osc_value}, Freq ID {freq_id}")
+        sendOSCParameters(channel, band, freqID, gainHex, qIDValue)
+        print(f"Updated {band} band for channel {channel}: Gain {gainHex}, Q {qIDValue}, Freq ID {freqID}")
 
 if __name__ == "__main__":
     print("Select the vocal type:")
@@ -583,19 +583,19 @@ if __name__ == "__main__":
     print("3. Mid Pitch (Flat)")
 
     try:
-        vocal_type_input = int(input("Enter the number for the desired vocal type: "))
-        vocal_types = ['Low Pitch', 'High Pitch', 'Mid Pitch']
-        vocal_type = vocal_types[vocal_type_input - 1]  # Adjust index for zero-based
+        inputVocalType = int(input("Enter the number for the desired vocal type: "))
+        vocalTypes = ['Low Pitch', 'High Pitch', 'Mid Pitch']
+        vocalType = vocalTypes[inputVocalType - 1]  # Adjust index for zero-based
     except (IndexError, ValueError):
         print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
-        vocal_type = 'Mid Pitch'
+        vocalType = 'Mid Pitch'
 
-    channel = get_valid_channel()  # Get a valid channel number from the user
+    channel = getValidChannel()  # Get a valid channel number from the user
 
-    print(f"Updating bands for vocal type {vocal_type} on channel {channel}...")
+    print(f"Updating bands for vocal type {vocalType} on channel {channel}...")
     try:
         while True:
-            update_all_bands(vocal_type, channel)
+            updateAllBands(vocalType, channel)
             print("Waiting for next update cycle...")
             time.sleep(1)  # Pause 10 seconds between updates
     except KeyboardInterrupt:
