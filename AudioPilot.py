@@ -337,16 +337,6 @@ def getClosestQIDValue(qValue):
     closestQ = min(qValues.keys(), key=lambda k: abs(k - qValue))
     return qValues[closestQ]
 
-
-def getClosestGainHex(gainValue):
-    """Return the closest gain hexadecimal value from the dictionary based on the provided gain value."""
-    if not eqGainValues:  # Check if eqGainValues is empty or undefined
-        return None
-    # Ensure gain_value is float for comparison
-    gainValue = float(gainValue)
-    closestGain = min(eqGainValues.keys(), key=lambda k: abs(k - gainValue))
-    return eqGainValues[closestGain]
-
 def getValidChannel():
     while True:
         channel = input("Enter the channel number from 01 to 32: ")
@@ -355,11 +345,11 @@ def getValidChannel():
         else:
             print("Invalid input. Please enter a number from 01 to 32.")
 
-def sendOSCParameters(channel, eqBand, freqID, gainHex, qIDValue):
+def sendOSCParameters(channel, eqBand, freqID, gainValue, qIDValue):
     """Send OSC message with all EQ parameters in one command, using frequency id."""
     formatFreqID = round(freqID, 4)  # Ensure it's a float with four decimal places
-    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, formatFreqID, gainHex, qIDValue])
-    print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {formatFreqID}, Gain {gainHex}, Q {qIDValue}")
+    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, formatFreqID, gainValue, qIDValue])
+    print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {formatFreqID}, Gain {gainValue}, Q {qIDValue}")
 
 def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
@@ -380,12 +370,11 @@ def updateAllBands(vocalType, channel):
         gainValue = calculateGain(highestDB, band, vocalType)
         qValue = calculateQValue(highestFreq, band)
         
-        gainHex = getClosestGainHex(gainValue)
         qIDValue = getClosestQIDValue(qValue)
         
         # Send combined parameters via OSC
-        sendOSCParameters(channel, band, freqID, gainHex, qIDValue)
-        print(f"Updated {band} band for channel {channel}: Gain {gainHex}, Q {qIDValue}, Freq ID {freqID}")
+        sendOSCParameters(channel, band, freqID, gainValue, qIDValue)
+        print(f"Updated {band} band for channel {channel}: Gain {gainValue}, Q {qIDValue}, Freq ID {freqID}")
 
 
 if __name__ == "__main__":
