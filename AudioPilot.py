@@ -61,8 +61,8 @@ def keepMixerAwake():
     while True:
         client.send_message('/xremote', None)
         client.send_message('/xinfo', None)
-        client.send_message('/ch/01/mix/fader', None)
-        client.send_message('/ch/01/dyn/mgain', None)
+        #client.send_message('/ch/01/mix/fader', None)
+        #client.send_message('/ch/01/dyn/mgain', None)
         time.sleep(3)
 
 # subscribtion and renewal of RTA data (/meters/15)
