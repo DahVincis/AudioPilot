@@ -284,9 +284,9 @@ def findClosestFrequency(bandName, targetFreq):
 def calculateGain(dbValue, band, vocalType):
     # Define gain multipliers for different vocal types and bands
     gainMultis = {
-        'Low Pitch': {'Low': 1.0, 'Low Mid': 0.8, 'High Mid': 1.2, 'High': 1.2},
-        'High Pitch': {'Low': 0.8, 'Low Mid': 0.7, 'High Mid': 0.6, 'High': 0.7},
-        'Mid Pitch': {'Low': 0.9, 'Low Mid': 0.85, 'High Mid': 1.1, 'High': 0.9}
+        'Low Pitch': {'Low': -1.0, 'Low Mid': -0.8, 'High Mid': 1.2, 'High': 1.2},
+        'High Pitch': {'Low': -0.8, 'Low Mid': -0.7, 'High Mid': -0.6, 'High': -0.7},
+        'Mid Pitch': {'Low': -0.9, 'Low Mid': -0.85, 'High Mid': 1.1, 'High': -0.9}
     }
 
     # Define the target dB level for flat response
@@ -354,7 +354,7 @@ def sendOSCParameters(channel, eqBand, freqID, gainValue, qIDValue):
 def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
     
-    for band in bands:
+    for index, band in enumerate(bands):
         highestFreq = findHighestFreqinBand(band)
         if highestFreq is None:
             print(f"No data for band {band}. Skipping...")
@@ -373,9 +373,8 @@ def updateAllBands(vocalType, channel):
         qIDValue = getClosestQIDValue(qValue)
         
         # Send combined parameters via OSC
-        sendOSCParameters(channel, band, freqID, gainValue, qIDValue)
+        sendOSCParameters(channel, index + 1, freqID, gainValue, qIDValue)  # Adjusted to send 1-based index
         print(f"Updated {band} band for channel {channel}: Gain {gainValue}, Q {qIDValue}, Freq ID {freqID}")
-
 
 if __name__ == "__main__":
     # search mixers on the network
