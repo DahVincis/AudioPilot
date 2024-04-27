@@ -68,4 +68,4 @@ Q value:
     We then grab that value and multiply it by the amount of frequencies 
     that have a similar dB value to the initial selected frequency (freqSize).
 
-    Final Formula: len(freqSize) * ((qMax - qMin)// len(lowBand)
+    Final Formula: len(freqSize) * ((qMax - qMin)// len(lowBand))

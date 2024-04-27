@@ -7,7 +7,7 @@ import threading
 import struct
 import select
 import sys
-from Data import frequencies, bandsRangeRTA, bandRanges, qValues, eqGainValues, dataRTA, gainOffset
+from Data import frequencies, bandsRangeRTA, bandRanges, qValues, eqGainValues, dataRTA, gainOffset, qLimits, gainMultis
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication
@@ -205,7 +205,7 @@ def handlerDefault(address, *args):
     print(f"Received fader message on {address}. Args: {args}")
 
 # Function to update the plot with the latest dB values
-def update_plot():
+def updatePlot():
     try:
         # Get the latest RTA data from the queue if available
         latestData = queueRTA.get_nowait()
@@ -234,17 +234,19 @@ def setLogTicks():
     labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
     plot.getAxis('bottom').setTicks([labelTicks])
 
+# Function to check if there are sufficient data points for a given frequency
 def hasSufficientData(freq):
     """Check if there are at least 10 dB values for the frequency."""
     return len(dataRTA.get(freq, [])) >= 10
 
+# Function to find the highest frequency in a given band
 def findHighestFreqinBand(bandName):
     bandRange = bandsRangeRTA.get(bandName)
     if not bandRange:
         return None  # or raise an error if preferred
 
     lowBound, upBound = bandRange
-    maxDB = float('-inf')
+    maxDB = -90.0
     maxFreq = None
 
     for freq, dbValues in dataRTA.items():
@@ -256,13 +258,14 @@ def findHighestFreqinBand(bandName):
 
     return maxFreq
 
+# Function to find the highest dB value in a given band
 def findHighestDBinBand(bandName):
     bandRange = bandsRangeRTA.get(bandName)
     if not bandRange:
         return None  # or raise an error if preferred
 
     lowBound, upBound = bandRange
-    maxDB = float('-inf')
+    maxDB = -90.0
 
     for freq, dbValues in dataRTA.items():
         if lowBound <= freq <= upBound:
@@ -272,6 +275,7 @@ def findHighestDBinBand(bandName):
 
     return maxDB
 
+# Function to find the closest frequency in a given band
 def findClosestFrequency(bandName, targetFreq):
     frequencies = bandRanges.get(bandName, [])
     if not frequencies or targetFreq is None:
@@ -281,13 +285,8 @@ def findClosestFrequency(bandName, targetFreq):
     closeFreqData = min(frequencies, key=lambda x: abs(x[1] - targetFreq))
     return closeFreqData  # This now returns the tuple (freqID, frequency)
 
+# Function to calculate the gain value for a given dB value, band, and vocal type
 def calculateGain(dbValue, band, vocalType):
-    # Define gain multipliers for different vocal types and bands
-    gainMultis = {
-        'Low Pitch': {'Low': -1.0, 'Low Mid': -0.8, 'High Mid': 1.2, 'High': 1.2},
-        'High Pitch': {'Low': -0.8, 'Low Mid': -0.7, 'High Mid': -0.6, 'High': -0.7},
-        'Mid Pitch': {'Low': -0.9, 'Low Mid': -0.85, 'High Mid': 1.1, 'High': -0.9}
-    }
 
     # Define the target dB level for flat response
     freqFlat = -45
@@ -296,7 +295,7 @@ def calculateGain(dbValue, band, vocalType):
     distance = dbValue - freqFlat
 
     # Get the multiplier based on vocal type and band
-    bandMulti = gainMultis.get(vocalType, {}).get(band, 1)
+    bandMulti = gainMultis.get(vocalType, {}).get(band, -1) # Default to 1 if not found
 
     # Calculate the gain
     gain = (distance / 10) * bandMulti
@@ -304,32 +303,42 @@ def calculateGain(dbValue, band, vocalType):
     return round(gain, 2)
 
 def calculateQValue(freq, band):
-    # Parameters for each band
-    qLimits = {
-        'Low': (3.0, 7.0),
-        'Low Mid': (2.5, 6.0),
-        'High Mid': (2.0, 5.5),
-        'High': (1.5, 4.5)
-    }
-
+    # Check if the band and frequency are valid
     if band not in bandRanges or band not in qLimits:
         return None
 
-    frequencies = [f[1] for f in bandRanges[band]]
-    bandSize = len(frequencies)
-    qMax, qMin = qLimits[band]
-    qLim = qMax - qMin
+    # Extract the range of frequencies from the band ranges
+    freqRange = bandRanges[band]
+    freqInBand = [f[1] for f in freqRange]
 
-    # Get dB values for the selected frequency
-    dbValue = max(dataRTA.get(freq, []))
-    # Count frequencies within the same dB range (-/+ 20 dB)
-    freqSize = sum(1 for f in frequencies if f in dataRTA and any(abs(dbValue - db) <= 25 for db in dataRTA[f]))
+    # Check if the frequency is within the range
+    if freq not in freqInBand:
+        return None
 
-    # Calculate the Q value
-    qValue = freqSize * (qLim / bandSize)
+    # Get the maximum dB value for the given frequency
+    if freq not in dataRTA or not dataRTA[freq]:
+        return None
 
-    return round(qValue + qMin, 2)
+    maxDbValue = max(dataRTA[freq])
 
+    # Retrieve the Q value limits for the band
+    qMax, qMin = qLimits[band]  # Note: qMax is now the first value (maximum Q value)
+
+    # Calculate the proportion of frequencies within +/- 25 dB range of maxDbValue
+    similarFreqCount = sum(
+        1 for f in freqInBand if f in dataRTA and any(abs(maxDbValue - db) <= 25 for db in dataRTA[f])
+    )
+
+    # Normalize the count to calculate Q value
+    bandSize = len(freqInBand)
+    qRange = qMax - qMin  # Correct calculation of the range
+
+    # Invert the proportion for Q calculation (as Q should decrease with increase in similar frequencies)
+    qValue = qMax - (similarFreqCount / bandSize) * qRange
+
+    return round(qValue, 2)
+
+# Function to get the closest Q value from the dictionary based on the provided Q value
 def getClosestQIDValue(qValue):
     """Return the closest Q OSC float value from the dictionary based on the provided Q value."""
     if not qValues:  # Check if qValues is empty or undefined
@@ -337,6 +346,14 @@ def getClosestQIDValue(qValue):
     closestQ = min(qValues.keys(), key=lambda k: abs(k - qValue))
     return qValues[closestQ]
 
+def getClosestGainValue(gain, eqGainValues):
+    # List of available gain keys
+    gainKeys = list(eqGainValues.keys())
+    # Find the closest value by minimizing the absolute difference
+    closestGain = min(gainKeys, key=lambda k: abs(k - gain))
+    return closestGain
+
+# Function to get a valid channel number from the user
 def getValidChannel():
     while True:
         channel = input("Enter the channel number from 01 to 32: ")
@@ -345,12 +362,14 @@ def getValidChannel():
         else:
             print("Invalid input. Please enter a number from 01 to 32.")
 
-def sendOSCParameters(channel, eqBand, freqID, gainValue, qIDValue):
+# Function to send all EQ parameters in one command using frequency ID
+def sendOSCParameters(channel, eqBand, freqID, gainValueActual, qIDValue):
     """Send OSC message with all EQ parameters in one command, using frequency id."""
     formatFreqID = round(freqID, 4)  # Ensure it's a float with four decimal places
-    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, formatFreqID, gainValue, qIDValue])
-    print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {formatFreqID}, Gain {gainValue}, Q {qIDValue}")
+    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, formatFreqID, gainValueActual, qIDValue])
+    #print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {formatFreqID}, Gain {gainValue}, Q {qIDValue}")
 
+# Function to update all bands for a given vocal type and channel
 def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
     
@@ -371,11 +390,13 @@ def updateAllBands(vocalType, channel):
         qValue = calculateQValue(highestFreq, band)
         
         qIDValue = getClosestQIDValue(qValue)
+        gainValueActual = getClosestGainValue(gainValue, eqGainValues)
         
         # Send combined parameters via OSC
-        sendOSCParameters(channel, index + 1, freqID, gainValue, qIDValue)  # Adjusted to send 1-based index
-        print(f"Updated {band} band for channel {channel}: Gain {gainValue}, Q {qIDValue}, Freq ID {freqID}")
+        sendOSCParameters(channel, index + 1, freqID, gainValueActual, qIDValue)  # Adjusted to send 1-based index
+        #print(f"Updated {band} band for channel {channel}: Gain {gainValue}, Q {qIDValue}, Freq ID {freqID}")
 
+# main function
 if __name__ == "__main__":
     # search mixers on the network
     mixers = discMixers()
@@ -438,7 +459,7 @@ if __name__ == "__main__":
 
     # Set up timer to update plot periodically
     timer = QTimer()
-    timer.timeout.connect(update_plot)
+    timer.timeout.connect(updatePlot)
     timer.start(100)  # Update the plot every 500 milliseconds
 
     # Start a separate thread to run the OSC server
@@ -463,7 +484,7 @@ if __name__ == "__main__":
         while True:
             updateAllBands(vocalType, channel)
             print("Waiting for next update cycle...")
-            time.sleep(1)  # Pause 10 seconds between updates
+            time.sleep(0.5)  # Pause 0.5 seconds between updates
     except KeyboardInterrupt:
         print("Updates stopped by user.")
 
