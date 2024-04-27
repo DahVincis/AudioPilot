@@ -211,8 +211,8 @@ def update_plot():
         latestData = queueRTA.get_nowait()
         
         # Define thresholds for coloring
-        threshUpper = -15
-        threshMid = -25
+        threshUpper = -10
+        threshMid = -18
         threshLower = -45
         # Update the plot with the latest dB values
         for freq in frequencies:
@@ -323,7 +323,7 @@ def calculateQValue(freq, band):
     # Get dB values for the selected frequency
     dbValue = max(dataRTA.get(freq, []))
     # Count frequencies within the same dB range (-/+ 20 dB)
-    freqSize = sum(1 for f in frequencies if f in dataRTA and any(abs(dbValue - db) <= 20 for db in dataRTA[f]))
+    freqSize = sum(1 for f in frequencies if f in dataRTA and any(abs(dbValue - db) <= 25 for db in dataRTA[f]))
 
     # Calculate the Q value
     qValue = freqSize * (qLim / bandSize)
@@ -404,9 +404,9 @@ if __name__ == "__main__":
     # map handlers to OSC addresses
     dispatcher = Dispatcher()
     dispatcher.map("/meters", handlerRTA)
-    dispatcher.map("/*/*/mix/fader", handlerFader)
+    """ dispatcher.map("/*/*/mix/fader", handlerFader)
     dispatcher.map("/*/*/preamp/trim", handlerPreampTrim)
-    dispatcher.set_default_handler(handlerDefault)
+    dispatcher.set_default_handler(handlerDefault) """
 
     server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
     print(f"Serving on {server.server_address}")
@@ -416,29 +416,7 @@ if __name__ == "__main__":
     threadKeepAlive = threading.Thread(target=keepMixerAwake, daemon=True)
     threadKeepAlive.start()
 
-    print("Select the vocal type:")
-    print("1. Low Pitch")
-    print("2. High Pitch")
-    print("3. Mid Pitch (Flat)")
-
-    try:
-        inputVocalType = int(input("Enter the number for the desired vocal type: "))
-        vocalTypes = ['Low Pitch', 'High Pitch', 'Mid Pitch']
-        vocalType = vocalTypes[inputVocalType - 1]  # Adjust index for zero-based
-    except (IndexError, ValueError):
-        print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
-        vocalType = 'Mid Pitch'
-
     channel = getValidChannel()  # Get a valid channel number from the user
-
-    print(f"Updating bands for vocal type {vocalType} on channel {channel}...")
-    try:
-        while True:
-            updateAllBands(vocalType, channel)
-            print("Waiting for next update cycle...")
-            time.sleep(1)  # Pause 10 seconds between updates
-    except KeyboardInterrupt:
-        print("Updates stopped by user.")
 
     threadRTASub = threading.Thread(target=subRenewRTA, daemon=True)
     threadRTASub.start()
@@ -466,6 +444,28 @@ if __name__ == "__main__":
     # Start a separate thread to run the OSC server
     threadServerOSC = threading.Thread(target=server.serve_forever, daemon=True)
     threadServerOSC.start()
+
+    print("Select the vocal type:")
+    print("1. Low Pitch")
+    print("2. High Pitch")
+    print("3. Mid Pitch (Flat)")
+
+    try:
+        inputVocalType = int(input("Enter the number for the desired vocal type: "))
+        vocalTypes = ['Low Pitch', 'High Pitch', 'Mid Pitch']
+        vocalType = vocalTypes[inputVocalType - 1]  # Adjust index for zero-based
+    except (IndexError, ValueError):
+        print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
+        vocalType = 'Mid Pitch'
+
+    print(f"Updating bands for vocal type {vocalType} on channel {channel}...")
+    try:
+        while True:
+            updateAllBands(vocalType, channel)
+            print("Waiting for next update cycle...")
+            time.sleep(1)  # Pause 10 seconds between updates
+    except KeyboardInterrupt:
+        print("Updates stopped by user.")
 
     # Start the PyQtGraph Application
     sys.exit(app.exec_())
