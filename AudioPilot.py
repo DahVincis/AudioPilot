@@ -300,7 +300,6 @@ def calculateGain(dbValue, band, vocalType):
     # Calculate the gain
     gain = (distance / 10) * bandMulti
 
-    #print(f"Calculated gain for {vocalType} in {band} band: {gain:.2f} dB")
     return round(gain, 2)
 
 def findSimilarFrequencies(frequencies, targetFreq):
@@ -308,34 +307,33 @@ def findSimilarFrequencies(frequencies, targetFreq):
     return min(frequencies, key=lambda x: abs(x - targetFreq))
 
 def calculateQValue(freq, band):
-    if band not in bandRanges or band not in qLimits:
+    # Retrieve the frequency range for the band
+    if band not in bandsRangeRTA:
+        print(f"Band {band} not found in bandsRangeRTA.")
         return None
+    lowBound, upBound = bandsRangeRTA[band]
 
-    # Get band frequency range and corresponding dB values
-    freqInBand = [f[1] for f in bandRanges[band]]
-    freqDataKeys = list(dataRTA.keys())
-    closestFreqs = [findSimilarFrequencies(freqDataKeys, f) for f in freqInBand if f in freqDataKeys]
-    print(f"Closest frequencies for {band} band: {closestFreqs}")
+    # Filter frequencies within the range that have data
+    relevantFreqs = {f: dbs for f, dbs in dataRTA.items() if lowBound <= f <= upBound}
 
-    maxDbValue = None
-    if freq in closestFreqs:
-        maxDbValue = max(dataRTA[freq])
-    if maxDbValue is None:
+    # Check for the maximum dB at the specific frequency
+    if freq not in relevantFreqs or not relevantFreqs[freq]:
+        print(f"No data or insufficient data for frequency {freq} in band {band}.")
         return None
-    print(f"Max dB value for {freq} Hz: {maxDbValue:.2f}")
+    maxDbValue = max(relevantFreqs[freq])
 
-    # Calculate frequencies within +/- 25 dB range
-    similarFreqCount = sum(
-        1 for f in closestFreqs if any(abs(maxDbValue - db) <= 10 for db in dataRTA[f])
-    )
-    print(f"Number of similar frequencies within 10 dB range: {similarFreqCount}")
+    # Count frequencies with dB values within +/- 10 dB of maxDbValue
+    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 15 for db in dbs))
 
+    # Calculate the Q value
     qMax, qMin = qLimits[band]
     qRange = qMax - qMin
-    bandSize = len(closestFreqs)
+    bandSize = len(relevantFreqs)
+    if bandSize == 0:
+        print(f"No frequencies with data in band {band}.")
+        return None
     qValue = qMax - (similarFreqCount / bandSize) * qRange
 
-    print(f"Calculated Q value for {band} band: {qValue:.2f}")
     return round(qValue, 2)
 
 # Function to safely get a Q ID value or return a default if None
@@ -364,7 +362,6 @@ def getValidChannel():
 def sendOSCParameters(channel, eqBand, freqID, gainID, qIDValue):
     """Send OSC message with all EQ parameters in one command, using frequency id and appropriate IDs for gain and Q."""
     client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
-    #print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {freqID}, Gain ID {gainID}, Q {qIDValue}")
 
 def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
@@ -381,17 +378,16 @@ def updateAllBands(vocalType, channel):
             print(f"No closest frequency found for band {band}. Skipping...")
             continue
         
-        freqID, actualFreq = closestFreqData
+        freqID = closestFreqData
         gainValue = calculateGain(highestDB, band, vocalType)
         gainID = eqGainValues[getClosestGainValue(gainValue, eqGainValues)]
-        #print(f"Calculated gain for {vocalType} in {band} band: {gainValue:.2f} dB (ID: {gainID})")
         
         qValue = calculateQValue(highestFreq, band)
         qIDValue = getClosestQIDValue(qValue)
         
         # Send combined parameters via OSC
         sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)  # Send gain ID instead of gain value
-        #print(f"Updated {band} band for channel {channel}: Gain {gainValue} dB (ID: {gainID}), Q {qValue} (ID: {qIDValue}), Freq ID {freqID}")
+        print(f"Updated {band} band for channel {channel}: Gain {gainValue} dB (ID: {gainID}), Q {qValue} (ID: {qIDValue}), Freq ID {freqID}")
 
 
 # Function to continuously update all bands
@@ -471,6 +467,7 @@ if __name__ == "__main__":
     threadServerOSC = threading.Thread(target=server.serve_forever, daemon=True)
     threadServerOSC.start()
 
+    # Get the vocal type from the user
     print("Select the vocal type:")
     print("1. Low Pitch")
     print("2. High Pitch")
