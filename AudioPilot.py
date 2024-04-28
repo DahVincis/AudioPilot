@@ -302,10 +302,12 @@ def calculateGain(dbValue, band, vocalType):
 
     return round(gain, 2)
 
+# Function to find the frequency closest to the target within the list
 def findSimilarFrequencies(frequencies, targetFreq):
     """Find the frequency closest to the target within the list."""
     return min(frequencies, key=lambda x: abs(x - targetFreq))
 
+# Function to calculate the Q value for a given frequency and band
 def calculateQValue(freq, band):
     # Retrieve the frequency range for the band
     if band not in bandsRangeRTA:
@@ -343,6 +345,7 @@ def getClosestQIDValue(qValue):
     closestQ = min(qValues.keys(), key=lambda k: abs(k - qValue))
     return qValues[closestQ]
 
+# Function to get the closest gain value from the available gain values
 def getClosestGainValue(gain, eqGainValues):
     # List of available gain keys
     gainKeys = list(eqGainValues.keys())
@@ -359,10 +362,12 @@ def getValidChannel():
         else:
             print("Invalid input. Please enter a number from 01 to 32.")
 
+# Function to send all EQ parameters in one command
 def sendOSCParameters(channel, eqBand, freqID, gainID, qIDValue):
     """Send OSC message with all EQ parameters in one command, using frequency id and appropriate IDs for gain and Q."""
     client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
 
+# Function to update all bands for a given vocal type and channel
 def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
     
@@ -378,7 +383,7 @@ def updateAllBands(vocalType, channel):
             print(f"No closest frequency found for band {band}. Skipping...")
             continue
         
-        freqID = closestFreqData
+        freqID, actualFreq = closestFreqData
         gainValue = calculateGain(highestDB, band, vocalType)
         gainID = eqGainValues[getClosestGainValue(gainValue, eqGainValues)]
         
@@ -387,8 +392,7 @@ def updateAllBands(vocalType, channel):
         
         # Send combined parameters via OSC
         sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)  # Send gain ID instead of gain value
-        print(f"Updated {band} band for channel {channel}: Gain {gainValue} dB (ID: {gainID}), Q {qValue} (ID: {qIDValue}), Freq ID {freqID}")
-
+        #print(f"Updated {band} band for channel {channel}: Gain {gainValue} dB (ID: {gainID}), Q {qValue} (ID: {qIDValue}), Freq ID {freqID}")
 
 # Function to continuously update all bands
 def threadUpdateBand(vocalType, channel):
