@@ -315,17 +315,20 @@ def calculateQValue(freq, band):
     freqInBand = [f[1] for f in bandRanges[band]]
     freqDataKeys = list(dataRTA.keys())
     closestFreqs = [findSimilarFrequencies(freqDataKeys, f) for f in freqInBand if f in freqDataKeys]
+    print(f"Closest frequencies for {band} band: {closestFreqs}")
 
     maxDbValue = None
     if freq in closestFreqs:
         maxDbValue = max(dataRTA[freq])
     if maxDbValue is None:
         return None
+    print(f"Max dB value for {freq} Hz: {maxDbValue:.2f}")
 
     # Calculate frequencies within +/- 25 dB range
     similarFreqCount = sum(
         1 for f in closestFreqs if any(abs(maxDbValue - db) <= 10 for db in dataRTA[f])
     )
+    print(f"Number of similar frequencies within 10 dB range: {similarFreqCount}")
 
     qMax, qMin = qLimits[band]
     qRange = qMax - qMin
