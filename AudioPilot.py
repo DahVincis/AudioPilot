@@ -295,54 +295,50 @@ def calculateGain(dbValue, band, vocalType):
     distance = dbValue - freqFlat
 
     # Get the multiplier based on vocal type and band
-    bandMulti = gainMultis.get(vocalType, {}).get(band, -1) # Default to 1 if not found
+    bandMulti = gainMultis.get(vocalType, {}).get(band, -1) # Default to -1 if not found
 
     # Calculate the gain
     gain = (distance / 10) * bandMulti
 
+    #print(f"Calculated gain for {vocalType} in {band} band: {gain:.2f} dB")
     return round(gain, 2)
 
+def findSimilarFrequencies(frequencies, targetFreq):
+    """Find the frequency closest to the target within the list."""
+    return min(frequencies, key=lambda x: abs(x - targetFreq))
+
 def calculateQValue(freq, band):
-    # Check if the band and frequency are valid
     if band not in bandRanges or band not in qLimits:
         return None
 
-    # Extract the range of frequencies from the band ranges
-    freqRange = bandRanges[band]
-    freqInBand = [f[1] for f in freqRange]
+    # Get band frequency range and corresponding dB values
+    freqInBand = [f[1] for f in bandRanges[band]]
+    freqDataKeys = list(dataRTA.keys())
+    closestFreqs = [findSimilarFrequencies(freqDataKeys, f) for f in freqInBand if f in freqDataKeys]
 
-    # Check if the frequency is within the range
-    if freq not in freqInBand:
+    maxDbValue = None
+    if freq in closestFreqs:
+        maxDbValue = max(dataRTA[freq])
+    if maxDbValue is None:
         return None
 
-    # Get the maximum dB value for the given frequency
-    if freq not in dataRTA or not dataRTA[freq]:
-        return None
-
-    maxDbValue = max(dataRTA[freq])
-
-    # Retrieve the Q value limits for the band
-    qMax, qMin = qLimits[band]  # Note: qMax is now the first value (maximum Q value)
-
-    # Calculate the proportion of frequencies within +/- 25 dB range of maxDbValue
+    # Calculate frequencies within +/- 25 dB range
     similarFreqCount = sum(
-        1 for f in freqInBand if f in dataRTA and any(abs(maxDbValue - db) <= 25 for db in dataRTA[f])
+        1 for f in closestFreqs if any(abs(maxDbValue - db) <= 10 for db in dataRTA[f])
     )
 
-    # Normalize the count to calculate Q value
-    bandSize = len(freqInBand)
-    qRange = qMax - qMin  # Correct calculation of the range
-
-    # Invert the proportion for Q calculation (as Q should decrease with increase in similar frequencies)
+    qMax, qMin = qLimits[band]
+    qRange = qMax - qMin
+    bandSize = len(closestFreqs)
     qValue = qMax - (similarFreqCount / bandSize) * qRange
 
+    print(f"Calculated Q value for {band} band: {qValue:.2f}")
     return round(qValue, 2)
 
-# Function to get the closest Q value from the dictionary based on the provided Q value
+# Function to safely get a Q ID value or return a default if None
 def getClosestQIDValue(qValue):
-    """Return the closest Q OSC float value from the dictionary based on the provided Q value."""
-    if not qValues:  # Check if qValues is empty or undefined
-        return None
+    if qValue is None or not qValues:
+        return 0.3380  # Define some default QID value that makes sense for your system
     closestQ = min(qValues.keys(), key=lambda k: abs(k - qValue))
     return qValues[closestQ]
 
@@ -362,14 +358,11 @@ def getValidChannel():
         else:
             print("Invalid input. Please enter a number from 01 to 32.")
 
-# Function to send all EQ parameters in one command using frequency ID
-def sendOSCParameters(channel, eqBand, freqID, gainValueActual, qIDValue):
-    """Send OSC message with all EQ parameters in one command, using frequency id."""
-    formatFreqID = round(freqID, 4)  # Ensure it's a float with four decimal places
-    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, formatFreqID, gainValueActual, qIDValue])
-    #print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {formatFreqID}, Gain {gainValue}, Q {qIDValue}")
+def sendOSCParameters(channel, eqBand, freqID, gainID, qIDValue):
+    """Send OSC message with all EQ parameters in one command, using frequency id and appropriate IDs for gain and Q."""
+    client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
+    #print(f"Sent OSC message to /ch/{channel}/eq/{eqBand} with parameters: Type 2, Frequency ID {freqID}, Gain ID {gainID}, Q {qIDValue}")
 
-# Function to update all bands for a given vocal type and channel
 def updateAllBands(vocalType, channel):
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
     
@@ -387,14 +380,23 @@ def updateAllBands(vocalType, channel):
         
         freqID, actualFreq = closestFreqData
         gainValue = calculateGain(highestDB, band, vocalType)
-        qValue = calculateQValue(highestFreq, band)
+        gainID = eqGainValues[getClosestGainValue(gainValue, eqGainValues)]
+        #print(f"Calculated gain for {vocalType} in {band} band: {gainValue:.2f} dB (ID: {gainID})")
         
+        qValue = calculateQValue(highestFreq, band)
         qIDValue = getClosestQIDValue(qValue)
-        gainValueActual = getClosestGainValue(gainValue, eqGainValues)
         
         # Send combined parameters via OSC
-        sendOSCParameters(channel, index + 1, freqID, gainValueActual, qIDValue)  # Adjusted to send 1-based index
-        #print(f"Updated {band} band for channel {channel}: Gain {gainValue}, Q {qIDValue}, Freq ID {freqID}")
+        sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)  # Send gain ID instead of gain value
+        #print(f"Updated {band} band for channel {channel}: Gain {gainValue} dB (ID: {gainID}), Q {qValue} (ID: {qIDValue}), Freq ID {freqID}")
+
+
+# Function to continuously update all bands
+def threadUpdateBand(vocalType, channel):
+    print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
+    while True:
+        updateAllBands(vocalType, channel)
+        time.sleep(0.5)  # Pause 0.5 seconds between updates
 
 # main function
 if __name__ == "__main__":
@@ -479,14 +481,9 @@ if __name__ == "__main__":
         print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
         vocalType = 'Mid Pitch'
 
-    print(f"Updating bands for vocal type {vocalType} on channel {channel}...")
-    try:
-        while True:
-            updateAllBands(vocalType, channel)
-            print("Waiting for next update cycle...")
-            time.sleep(0.5)  # Pause 0.5 seconds between updates
-    except KeyboardInterrupt:
-        print("Updates stopped by user.")
+    # Start the continuous update in a separate thread
+    threadUpdateBands = threading.Thread(target=threadUpdateBand, args=(vocalType, channel), daemon=True)
+    threadUpdateBands.start()
 
     # Start the PyQtGraph Application
     sys.exit(app.exec_())
