@@ -1,6 +1,6 @@
-# Behringer Mixer OSC Interface
+## Overview
 
-This project provides a Python interface to interact with Behringer digital mixers over OSC (Open Sound Control) protocol. It includes functionality to keep the mixer awake via periodic "keep-alive" messages, subscribe to and renew real-time analyzer (RTA) data, convert fader positions to decibel (dB) values, and process RTA data into dB values for frequency bands. This tool is designed for sound engineers, developers, and hobbyists looking to extend control and receive data from Behringer mixers programmatically.
+AudioPilot is a Python-based software designed to interact with digital audio mixers on a network using the Open Sound Control (OSC) protocol. It provides a range of functionalities from discovering mixers on the network to processing real-time audio data (RTA), controlling mixer parameters, and visualizing frequency responses.
 
 ## Features
 
@@ -20,16 +20,6 @@ You can install the necessary Python packages using pip:
 
 ```bash
 pip install python-osc numpy
-```
-
-## Usage
-
-### Configuration
-
-Before running the script, ensure the IP address of your Behringer mixer is correctly set in the script:
-
-```python
-X32IP = '192.168.10.104'  # Change this to the IP address of your Behringer mixer
 ```
 
 ### Running the Script
@@ -58,3 +48,47 @@ You can customize the frequency list or gain value in the script to tailor the f
 ## Contributing
 
 Contributions to improve the project are welcome. Please feel free to fork the repository, make changes, and submit pull requests. For major changes, please open an issue first to discuss what you would like to change.
+
+## Features
+
+- **Mixer Discovery**: Automatically detects mixers within specified subnets.
+- **Keep-Alive**: Sends periodic messages to keep the mixer awake.
+- **Real-Time Audio Data Subscription and Renewal**: Manages RTA data subscriptions.
+- **dB Value Processing**: Converts mixer data points to decibel values.
+- **Dynamic EQ Control**: Adjusts EQ parameters based on RTA data and pre-set profiles for different vocal types.
+- **Visualization**: Plots real-time frequency response histograms using PyQtGraph.
+
+## Requirements
+
+- Python 3.x
+- `python-osc`
+- `pyqtgraph`
+- `PyQt5`
+- Networked digital audio mixer compatible with OSC protocol (X32 or M32 Consoles)
+
+## Installation
+
+To install AudioPilot, simply clone the repository and install the required Python packages.
+
+```bash
+git clone https://github.com/yourrepo/audiopilot.git
+cd audiopilot
+pip install -r requirements.txt
+```
+
+## Usage
+
+1. Run `AudioPilot.py` to begin the mixer discovery process.
+2. Select a discovered mixer to interact with.
+3. Choose the vocal type that corresponds to your scenario.
+4. Observe the real-time frequency response in the visualization window.
+
+For advanced usage, refer to the detailed comments within the code.
+
+## Contributing
+
+Contributions to AudioPilot are welcome! Please follow the standard fork-branch-pull request workflow.
+
+## Authors
+
+- Pedro H. Fernandes
