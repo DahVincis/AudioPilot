@@ -71,7 +71,7 @@ Contributions to improve the project are welcome. Please feel free to fork the r
 To install AudioPilot, simply clone the repository and install the required Python packages.
 
 ```bash
-git clone https://github.com/yourrepo/audiopilot.git
+git clone https://github.com/DahVincis/AudioPilot.git
 cd audiopilot
 pip install -r requirements.txt
 ```
