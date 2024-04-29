@@ -325,7 +325,7 @@ def calculateQValue(freq, band):
     maxDbValue = max(relevantFreqs[freq])
 
     # Count frequencies with dB values within +/- 10 dB of maxDbValue
-    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 15 for db in dbs))
+    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 8 for db in dbs))
 
     # Calculate the Q value
     qMax, qMin = qLimits[band]
@@ -399,7 +399,7 @@ def threadUpdateBand(vocalType, channel):
     print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
     while True:
         updateAllBands(vocalType, channel)
-        time.sleep(0.5)  # Pause 0.5 seconds between updates
+        time.sleep(0.1)  # Pause 0.1 seconds between updates
 
 # main function
 if __name__ == "__main__":

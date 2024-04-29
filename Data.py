@@ -107,9 +107,9 @@ gainMultis = {
 
 # Parameters for each band
 qLimits = {
-    'Low': (3.0, 7.0),
-    'Low Mid': (2.5, 6.0),
-    'High Mid': (2.0, 5.5),
+    'Low': (1.0, 7.0),
+    'Low Mid': (1.5, 6.0),
+    'High Mid': (1.0, 5.5),
     'High': (1.5, 4.5)
 }
 
