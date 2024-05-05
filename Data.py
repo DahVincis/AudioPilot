@@ -100,8 +100,8 @@ dataRTA = {
 '''
 # Define gain multipliers for different vocal types and bands
 gainMultis = {
-    'Low Pitch': {'Low': -2.5, 'Low Mid': -2.3, 'High Mid': 2.3, 'High': 2.1},
-    'High Pitch': {'Low': -1.9, 'Low Mid': -2.0, 'High Mid': -2.4, 'High': -2.6},
+    'Low Pitch': {'Low': -2.5, 'Low Mid': -2.3, 'High Mid': 1.6, 'High': 1.4},
+    'High Pitch': {'Low': -1.9, 'Low Mid': -1.8, 'High Mid': -2.4, 'High': -2.6},
     'Mid Pitch': {'Low': -2.0, 'Low Mid': -1.9, 'High Mid': 2.8, 'High': -1.7}
 }
 
@@ -370,8 +370,8 @@ eqGainValues = {   # gain:gain_id   -15.0 to 15.0
 }
 
 bandsRangeRTA = {
-    'Low': (118, 292),
-    'Low Mid': (313, 1090),
+    'Low': (146, 359),
+    'Low Mid': (412, 1090),
     'High Mid': (1170, 5000),
     'High': (5360, 18660)
 }

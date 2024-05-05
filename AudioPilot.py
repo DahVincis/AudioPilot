@@ -325,7 +325,7 @@ def calculateQValue(freq, band):
     maxDbValue = max(relevantFreqs[freq])
 
     # Count frequencies with dB values within +/- 10 dB of maxDbValue
-    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 8 for db in dbs))
+    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 6 for db in dbs))
 
     # Calculate the Q value
     qMax, qMin = qLimits[band]
