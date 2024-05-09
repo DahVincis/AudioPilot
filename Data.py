@@ -100,7 +100,7 @@ dataRTA = {
 '''
 # Define gain multipliers for different vocal types and bands
 gainMultis = {
-    'Low Pitch': {'Low': -2.5, 'Low Mid': -2.3, 'High Mid': 1.4, 'High': 1.2},
+    'Low Pitch': {'Low': -2.4, 'Low Mid': -2.2, 'High Mid': 1.0, 'High': 0.9},
     'High Pitch': {'Low': -1.9, 'Low Mid': -1.8, 'High Mid': -2.2, 'High': -2.4},
     'Mid Pitch': {'Low': -2.0, 'Low Mid': -1.9, 'High Mid': 2.8, 'High': -1.7}
 }
