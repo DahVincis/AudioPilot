@@ -26,11 +26,11 @@ def checkMixerIP(ip, port):
         ready = select.select([tempClient._sock], [], [], 0.1)
         if ready[0]:
             data, addr = tempClient._sock.recvfrom(1024)
-            print(f"Discovered mixer at {addr[0]}")
+            #print(f"Discovered mixer at {addr[0]}")
             return addr[0], data
     except Exception as e:
-        print(f"No mixer at {ip}: {e}")
-    return None
+        pass
+
 
 def discMixers():
     discIPs = {}
@@ -50,7 +50,7 @@ def discMixers():
                 ip, rawData = result
                 details = handlerXInfo(rawData)
                 discIPs[ip] = details
-                print(f"Discovered mixer at {ip} with details: {details}")
+                #print(f"Discovered mixer at {ip} with details: {details}")
 
     return discIPs
 
