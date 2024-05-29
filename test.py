@@ -119,7 +119,7 @@ custom_frequencies = [
 ]
 
 # Function to create custom ticks with abbreviations
-def create_custom_ticks(frequencies):
+def customTicks(frequencies):
     ticks = []
     for freq in frequencies:
         if freq >= 1000:
@@ -182,7 +182,7 @@ class MainWindow(QMainWindow):
 
         # Custom x-axis ticks
         x_axis = self.plot.getAxis('bottom')
-        x_ticks = create_custom_ticks(custom_frequencies)
+        x_ticks = customTicks(custom_frequencies)
         x_axis.setTicks(x_ticks)
 
         # Add plot layout to main layout
