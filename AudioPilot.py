@@ -10,8 +10,8 @@ import sys
 from Data import frequencies, bandsRangeRTA, bandRanges, qValues, eqGainValues, dataRTA, gainOffset, qLimits, gainMultis
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QTimer
 import numpy as np
 from queue import Queue, Empty
 
