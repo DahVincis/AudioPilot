@@ -334,7 +334,7 @@ def calculateQValue(freq, band):
     if bandSize == 0:
         print(f"No frequencies with data in band {band}.")
         return None
-    qValue = qMax - (similarFreqCount / bandSize) * qRange
+    qValue = qMin + (similarFreqCount / bandSize) * qRange
 
     return round(qValue, 2)
 
