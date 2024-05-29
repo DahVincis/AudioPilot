@@ -1,12 +1,9 @@
 import sys
-import threading
-import time
-from queue import Queue, Empty
 
 import pyqtgraph as pg
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QLabel
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import Qt
 
 # hardcoded frequencies based on /meters/15 data
 frequencies = [
@@ -113,7 +110,7 @@ dataRTA = {
     # Start the RTA data simulation thread (replace with actual OSC server setup)
 
 # Define the specific frequencies to show on the x-axis
-custom_frequencies = [
+custfreq = [
     20, 42, 63, 84, 103, 206, 313, 412, 625, 825, 1020,
     2030, 3080, 4060, 5000, 6160, 8120, 10000, 18660
 ]
@@ -181,9 +178,9 @@ class MainWindow(QMainWindow):
         bars = {freq: self.plot.plot([freq, freq], [-90, -90], pen=pg.mkPen('r', width=3)) for freq in frequencies}
 
         # Custom x-axis ticks
-        x_axis = self.plot.getAxis('bottom')
-        x_ticks = customTicks(custom_frequencies)
-        x_axis.setTicks(x_ticks)
+        xAxis = self.plot.getAxis('bottom')
+        xTicks = customTicks(custfreq)
+        xAxis.setTicks(xTicks)
 
         # Add plot layout to main layout
         mainLayout.addLayout(plotLayout)
