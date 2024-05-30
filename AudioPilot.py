@@ -10,8 +10,8 @@ import sys
 from Data import frequencies, bandsRangeRTA, bandRanges, qValues, eqGainValues, dataRTA, gainOffset, qLimits, gainMultis
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pyqtgraph as pg
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QTimer
 import numpy as np
 from queue import Queue, Empty
 
@@ -258,6 +258,25 @@ def findHighestFreqinBand(bandName):
 
     return maxFreq
 
+# Function to find the lowest frequency in a given band corresponding to the lowest dB value
+def findLowestFreqinBand(bandName):
+    bandRange = bandsRangeRTA.get(bandName)
+    if not bandRange:
+        return None  # or raise an error if preferred
+
+    lowBound, upBound = bandRange
+    minDB = 0.0
+    minFreq = None
+
+    for freq, dbValues in dataRTA.items():
+        if lowBound <= freq <= upBound:
+            currentMinDB = min(dbValues)
+            if currentMinDB < minDB:
+                minDB = currentMinDB
+                minFreq = freq
+
+    return minFreq
+
 # Function to find the highest dB value in a given band
 def findHighestDBinBand(bandName):
     bandRange = bandsRangeRTA.get(bandName)
@@ -274,6 +293,27 @@ def findHighestDBinBand(bandName):
                 maxDB = currentMaxDB
 
     return maxDB
+
+# Function to find the lowest dB value in a given band
+def findLowestDBinBand(bandName):
+    bandRange = bandsRangeRTA.get(bandName)
+    if not bandRange:
+        return None  # or raise an error if preferred
+
+    lowBound, upBound = bandRange
+    minDB = None  # Start with no minimum value
+
+    for freq, dbValues in dataRTA.items():
+        if lowBound <= freq <= upBound:
+            # Filter out -90 dB values before finding the minimum
+            filteredDBValues = [db for db in dbValues if db > -90]
+            if filteredDBValues:
+                currentMinDB = min(filteredDBValues)
+                # Initialize minDB if it hasn't been set or update it if currentMinDB is lower
+                if minDB is None or currentMinDB < minDB:
+                    minDB = currentMinDB
+
+    return minDB
 
 # Function to find the closest frequency in a given band
 def findClosestFrequency(bandName, targetFreq):
@@ -302,6 +342,22 @@ def calculateGain(dbValue, band, vocalType):
 
     return round(gain, 2)
 
+def calculateGainForLowestDB(dbValue, band, vocalType):
+    # Define the target dB level for a desired flat response
+    freqFlat = -45  # Example target dB level for flat response
+
+    # Calculate the distance from the target dB level
+    distance = dbValue - freqFlat
+
+    # Fetch the gain multiplier for the vocal type and band
+    bandMulti = gainMultis.get(vocalType, {}).get(band, 0)
+
+    # Calculate the gain based on the distance and the multiplier
+    gain = distance * bandMulti
+
+    return round(gain, 2)
+
+
 # Function to find the frequency closest to the target within the list
 def findSimilarFrequencies(frequencies, targetFreq):
     """Find the frequency closest to the target within the list."""
@@ -325,7 +381,7 @@ def calculateQValue(freq, band):
     maxDbValue = max(relevantFreqs[freq])
 
     # Count frequencies with dB values within +/- 6 dB of maxDbValue
-    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 6 for db in dbs))
+    similarFreqCount = sum(1 for dbs in relevantFreqs.values() if any(abs(maxDbValue - db) <= 5 for db in dbs))
 
     # Calculate the Q value
     qMax, qMin = qLimits[band]
@@ -369,29 +425,50 @@ def sendOSCParameters(channel, eqBand, freqID, gainID, qIDValue):
 
 # Function to update all bands for a given vocal type and channel
 def updateAllBands(vocalType, channel):
+    # Define the band names to process
     bands = ['Low', 'Low Mid', 'High Mid', 'High']
     
     for index, band in enumerate(bands):
-        highestFreq = findHighestFreqinBand(band)
-        if highestFreq is None:
-            print(f"No data for band {band}. Skipping...")
+        # Fetch the gain multiplier for the current vocal type and band
+        multiplier = gainMultis.get(vocalType, {}).get(band, 0)
+        
+        # Decide whether to find the lowest or highest dB value based on the sign of the multiplier
+        if multiplier > 0:
+            # If the multiplier is positive, find the lowest dB value and frequency (looking to boost weaker frequencies)
+            targetDB = findLowestDBinBand(band)
+            targetFreq = findLowestFreqinBand(band)
+        else:
+            # If the multiplier is negative or zero, find the highest dB value and frequency (looking to reduce stronger frequencies)
+            targetDB = findHighestDBinBand(band)
+            targetFreq = findHighestFreqinBand(band)
+
+        # Skip the current band if no dB value or frequency data is found
+        if targetDB is None or targetFreq is None:
+            print(f"No dB data or frequency data for band {band}. Skipping...")
             continue
         
-        highestDB = findHighestDBinBand(band)
-        closestFreqData = findClosestFrequency(band, highestFreq)
-        if closestFreqData is None:
+        # Find the closest frequency data point to the targeted frequency
+        freqID, actualFreq = findClosestFrequency(band, targetFreq)
+        if freqID is None:
             print(f"No closest frequency found for band {band}. Skipping...")
             continue
         
-        freqID, actualFreq = closestFreqData
-        gainValue = calculateGain(highestDB, band, vocalType)
+        # Calculate the gain value for the target dB, band, and vocal type
+        if multiplier > 0:
+            gainValue = calculateGainForLowestDB(targetDB, band, vocalType)
+        else:
+            gainValue = calculateGain(targetDB, band, vocalType)
+        
+        # Convert the gain value to its corresponding ID for use in OSC commands
         gainID = eqGainValues[getClosestGainValue(gainValue, eqGainValues)]
         
-        qValue = calculateQValue(highestFreq, band)
+        # Calculate the Q value for the targeted frequency in the band
+        qValue = calculateQValue(targetFreq, band)
+        # Convert the Q value to its corresponding ID for use in OSC commands
         qIDValue = getClosestQIDValue(qValue)
         
-        # Send combined parameters via OSC
-        sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)  # Send gain ID instead of gain value
+        # Send combined parameters via OSC: frequency, gain, and Q value IDs
+        sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)
         #print(f"Updated {band} band for channel {channel}: Gain {gainValue} dB (ID: {gainID}), Q {qValue} (ID: {qIDValue}), Freq ID {freqID}")
 
 # Function to continuously update all bands
