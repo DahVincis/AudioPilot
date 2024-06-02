@@ -31,7 +31,6 @@ def checkMixerIP(ip, port):
     except Exception as e:
         pass
 
-
 def discMixers():
     discIPs = {}
     discPort = 10023  # The port where mixers listen for OSC messages
@@ -344,7 +343,7 @@ def calculateGain(dbValue, band, vocalType):
 
 def calculateGainForLowestDB(dbValue, band, vocalType):
     # Define the target dB level for a desired flat response
-    freqFlat = -45  # Example target dB level for flat response
+    freqFlat = -45
 
     # Calculate the distance from the target dB level
     distance = dbValue - freqFlat
@@ -353,10 +352,9 @@ def calculateGainForLowestDB(dbValue, band, vocalType):
     bandMulti = gainMultis.get(vocalType, {}).get(band, 0)
 
     # Calculate the gain based on the distance and the multiplier
-    gain = distance * bandMulti
+    gain = np.log(distance - freqFlat *2) *bandMulti
 
     return round(gain, 2)
-
 
 # Function to find the frequency closest to the target within the list
 def findSimilarFrequencies(frequencies, targetFreq):
@@ -476,7 +474,7 @@ def threadUpdateBand(vocalType, channel):
     print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
     while True:
         updateAllBands(vocalType, channel)
-        time.sleep(0.1)  # Pause 0.1 seconds between updates
+        time.sleep(0.3)  # Pause 0.1 seconds between updates
 
 # main function
 if __name__ == "__main__":
