@@ -15,19 +15,19 @@ class ChannelSelectorDialog(QDialog):
 
     def initUI(self):
         layout = QGridLayout()
-        self.button_group = QButtonGroup(self)
+        self.buttonGroup = QButtonGroup(self)
 
         for i in range(1, 33):
             btn = QPushButton(f"CH {i:02}")
             btn.setCheckable(True)
             btn.clicked.connect(self.select_channel)
-            self.button_group.addButton(btn, i)
+            self.buttonGroup.addButton(btn, i)
             layout.addWidget(btn, (i-1)//8, (i-1)%8)
 
         self.setLayout(layout)
 
     def select_channel(self):
-        selected_button = self.button_group.checkedButton()
+        selected_button = self.buttonGroup.checkedButton()
         if selected_button:
             self.selected_channel = selected_button.text()
             self.accept()
