@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QGridLayout, QDialog, QDialogButtonBox, QGraphicsRectItem, QMainWindow,
+    QLabel, QGridLayout, QDialog, QGraphicsRectItem, QMainWindow,
     QSlider, QComboBox, QDial, QButtonGroup, QFormLayout
 )
 from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSlot
@@ -119,14 +119,6 @@ class MixerManager:
             self.client.send_message('/xremote', None)
             self.client.send_message('/xinfo', None)
             time.sleep(3)
-
-    def getValidChannel(self):
-        while True:
-            channel = input("Enter the channel number from 01 to 32: ")
-            if channel.isdigit() and 1 <= int(channel) <= 32:
-                return channel.zfill(2)
-            else:
-                print("Invalid input. Please enter a number from 01 to 32.")
 
 class RTASubscriber:
     def __init__(self, client):
@@ -268,6 +260,9 @@ class PlotManager:
         self.plot.getAxis('bottom').setTicks([labelTicks])
 
 class BandManager:
+    def __init__(self, client):
+        self.client = client
+
     def hasSufficientData(self, freq):
         return len(dataRTA.get(freq, [])) >= 10
 
@@ -382,7 +377,7 @@ class BandManager:
         return closestGain
 
     def sendOSCParameters(self, channel, eqBand, freqID, gainID, qIDValue):
-        client.send_message(f'/ch/{channel}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
+        self.client.send_message(f'/ch/{channel + 1}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
 
     def updateAllBands(self, vocalType, channel):
         bands = ['Low', 'Low Mid', 'High Mid', 'High']
@@ -413,9 +408,10 @@ class BandManager:
     def threadUpdateBand(self, vocalType, channel):
         print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
         while True:
+            if not self.band_manager_thread_running:
+                break
             self.updateAllBands(vocalType, channel)
             time.sleep(0.3)
-
 class ApplicationManager:
     def __init__(self, client, server):
         self.client = client
@@ -426,39 +422,18 @@ class ApplicationManager:
         threadKeepAlive = threading.Thread(target=mixer_manager.keepMixerAwake, daemon=True)
         threadKeepAlive.start()
 
-        channel = mixer_manager.getValidChannel()
-
         rta_subscriber = RTASubscriber(self.client)
         threadRTASub = threading.Thread(target=rta_subscriber.subRenewRTA, daemon=True)
         threadRTASub.start()
 
         app = QApplication([])
-        audio_mixer_ui = AudioPilotUI(mixer_ip)
+        audio_mixer_ui = AudioPilotUI(mixer_ip, self.client)
 
         plot_manager = PlotManager(audio_mixer_ui.plot)
-
-        timer = QTimer()
-        timer.timeout.connect(plot_manager.updatePlot)
-        timer.start(100)
+        audio_mixer_ui.plot_manager = plot_manager  # Assign the plot_manager to the UI
 
         threadServerOSC = threading.Thread(target=self.server.serve_forever, daemon=True)
         threadServerOSC.start()
-
-        print("Select the vocal type:")
-        print("1. Low Pitch")
-        print("2. High Pitch")
-        print("3. Mid Pitch (Flat)")
-        try:
-            inputVocalType = int(input("Enter the number for the desired vocal type: "))
-            vocalTypes = ['Low Pitch', 'High Pitch', 'Mid Pitch']
-            vocalType = vocalTypes[inputVocalType - 1]
-        except (IndexError, ValueError):
-            print("Invalid input. Defaulting to 'Mid Pitch (Flat)'.")
-            vocalType = 'Mid Pitch'
-
-        band_manager = BandManager()
-        threadUpdateBands = threading.Thread(target=band_manager.threadUpdateBand, args=(vocalType, channel), daemon=True)
-        threadUpdateBands.start()
 
         sys.exit(app.exec())
 
@@ -508,9 +483,14 @@ class SettingsDialog(QDialog):
         self.setLayout(layout)
 
 class AudioPilotUI(QWidget):
-    def __init__(self, mixerIP):
+    def __init__(self, mixerIP, client):
         super().__init__()
         self.mixerAddress = mixerIP
+        self.client = client
+        self.plot_manager = None  # Initialize plot_manager
+        self.channel_num = None  # Initialize channel number
+        self.band_manager_thread = None  # To handle the band manager thread
+        self.band_manager_thread_running = threading.Event()  # To track the state of the band manager thread
         self.initUI()
 
     def initUI(self):
@@ -579,13 +559,27 @@ class AudioPilotUI(QWidget):
         gainLayout.addWidget(self.gainDial)
         eqControls.addLayout(gainLayout)
 
-        self.settingsButton = QPushButton("Settings")
-        self.settingsButton.clicked.connect(self.displaySettingsDialog)
-        eqControls.addWidget(self.settingsButton)
+        lowcutLayout = QVBoxLayout()
+        lowcutLabel = QLabel("Lowcut Frequency")
+        lowcutLayout.addWidget(lowcutLabel)
+        self.lowcutDial = QDial()
+        self.lowcutDial.setRange(20, 400)  # Frequency range in Hz
+        self.lowcutDial.setValue(100)
+        lowcutLayout.addWidget(self.lowcutDial)
+        eqControls.addLayout(lowcutLayout)
 
-        self.bandSelector = QComboBox()
-        self.bandSelector.addItems(["Low", "Low Mid", "High Mid", "High"])
-        eqControls.addWidget(self.bandSelector)
+        # Pitch Type Selector and Toggle
+        pitchLayout = QVBoxLayout()
+        self.pitchTypeSelector = QComboBox()
+        self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
+        pitchLayout.addWidget(self.pitchTypeSelector)
+        
+        self.pitchToggle = QPushButton("Pitch Correction On/Off")
+        self.pitchToggle.setCheckable(True)
+        self.pitchToggle.clicked.connect(self.togglePitchCorrection)
+        pitchLayout.addWidget(self.pitchToggle)
+        
+        eqControls.addLayout(pitchLayout)
 
         topLayout.addLayout(eqControls)
 
@@ -628,25 +622,28 @@ class AudioPilotUI(QWidget):
 
         self.setLayout(mainLayout)
 
-        # Timer to update plot periodically
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.redrawPlot)
-        self.timer.start(100)
-
         self.setWindowTitle('Audio Mixer')
         self.show()
 
     def redrawPlot(self):
-        plotManager.updatePlot()
+        if self.plot_manager:
+            self.plot_manager.updatePlot()
 
     def showChannelSelector(self):
         self.channelSelectorDialog = ChannelSelectorDialog(self)
         if self.channelSelectorDialog.exec() == QDialog.DialogCode.Accepted:
             self.selectChannelButton.setText(self.channelSelectorDialog.selectedChannel)
+            self.channel_num = int(self.channelSelectorDialog.selectedChannel.split()[1]) - 1
+            self.client.send_message('/-action/setrtasrc', [self.channel_num])
+            # Now start receiving and updating data for the selected channel
+            self.startPlotting()
 
-    def displaySettingsDialog(self):
-        self.settingsDialog = SettingsDialog(self)
-        self.settingsDialog.exec()
+    def startPlotting(self):
+        if not self.plot_manager:
+            self.plot_manager = PlotManager(self.plot)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.redrawPlot)
+        self.timer.start(100)
 
     def toggleMute(self):
         if self.toggleMuteButton.isChecked():
@@ -664,6 +661,29 @@ class AudioPilotUI(QWidget):
             self.dimmingRectangle.show()
             print("EQ is off.")
 
+    def togglePitchCorrection(self):
+        if self.pitchToggle.isChecked():
+            vocalType = self.pitchTypeSelector.currentText()
+            self.startBandManager(vocalType)
+        else:
+            self.stopBandManager()
+
+    def startBandManager(self, vocalType):
+        if self.channel_num is not None:
+            self.band_manager_thread_running.set()  # Set the event to start the thread
+            self.band_manager = BandManager(self.client)
+            self.band_manager_thread = threading.Thread(target=self.runBandManager, args=(vocalType, self.channel_num), daemon=True)
+            self.band_manager_thread.start()
+
+    def stopBandManager(self):
+        if self.band_manager_thread is not None:
+            self.band_manager_thread_running.clear()  # Clear the event to stop the thread
+
+    def runBandManager(self, vocalType, channel):
+        while self.band_manager_thread_running.is_set():
+            self.band_manager.updateAllBands(vocalType, channel)
+            time.sleep(0.3)
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     mixerDiscoveryDialog = MixerDiscoveryUI()
@@ -680,17 +700,15 @@ if __name__ == "__main__":
         subRTA = RTASubscriber(client)
         faderHandler = FaderHandler()
         dispatcher.map("/meters", subRTA.handlerRTA)
-        dispatcher.map("/*/*/mix/fader", faderHandler.handlerFader)
-        dispatcher.map("/*/*/preamp/trim", faderHandler.handlerPreampTrim)
-        dispatcher.set_default_handler(faderHandler.handlerDefault)
+        #dispatcher.map("/*/*/mix/fader", faderHandler.handlerFader)
+        #dispatcher.map("/*/*/preamp/trim", faderHandler.handlerPreampTrim)
+        #dispatcher.set_default_handler(faderHandler.handlerDefault)
 
         server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
         print(f"Serving on {server.server_address}")
         client._sock = server.socket
 
         appManager = ApplicationManager(client, server)
-        uiAudioPilot = AudioPilotUI(chosenIP)
-        plotManager = PlotManager(uiAudioPilot.plot)
         appManager.run(chosenIP)
     else:
         sys.exit()
