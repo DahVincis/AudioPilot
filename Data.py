@@ -1,4 +1,7 @@
 # hardcoded frequencies based on /meters/15 data
+from queue import Queue
+
+
 frequencies = [
     20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
     39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
@@ -379,3 +382,8 @@ bandsRangeRTA = {
 
 # offest for dB values
 gainOffset = 38
+
+# Global variables
+queueRTA = Queue()
+receivedFirstRTA = False
+bars = {}
