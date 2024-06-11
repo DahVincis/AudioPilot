@@ -1,0 +1,15 @@
+Mixer:
+    Search:
+    search on network for mixers
+    checking if a mixer is present on a ip address
+
+    Data Handlers:
+
+
+June 11th, 1PM:
+    To do:
+        Written SRS: User interface design, description of all features
+        Tests / adjustments for gain calculateGain
+        Layout for AudioPilot App
+        Integration of the RTA plot in app
+        receive updated data for fader, gain *
