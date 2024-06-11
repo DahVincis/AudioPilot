@@ -1,4 +1,3 @@
-# Imports
 import threading
 import time
 import numpy as np
@@ -10,7 +9,6 @@ from pythonosc.udp_client import SimpleUDPClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import select
 
-# Local imports
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
 
 class ApplicationManager:
@@ -20,20 +18,20 @@ class ApplicationManager:
 
     def run(self, mixer_ip):
         from osc_handlers import RTASubscriber
-        mixer_manager = MixerManager(self.client)
-        threadKeepAlive = threading.Thread(target=mixer_manager.keepMixerAwake, daemon=True)
+        mixerManager = MixerManager(self.client)
+        threadKeepAlive = threading.Thread(target=mixerManager.keepMixerAwake, daemon=True)
         threadKeepAlive.start()
 
-        rta_subscriber = RTASubscriber(self.client)
-        threadRTASub = threading.Thread(target=rta_subscriber.subRenewRTA, daemon=True)
+        subscriberRTA = RTASubscriber(self.client)
+        threadRTASub = threading.Thread(target=subscriberRTA.subRenewRTA, daemon=True)
         threadRTASub.start()
 
         app = QApplication([])
-        from ui import AudioPilotUI  # Local import to avoid circular dependency
-        audio_mixer_ui = AudioPilotUI(mixer_ip, self.client)
+        from ui import AudioPilotUI  # aocal import to avoid circular dependency
+        mixerUI = AudioPilotUI(mixer_ip, self.client)
 
-        plot_manager = PlotManager(audio_mixer_ui.plot)
-        audio_mixer_ui.plot_manager = plot_manager  # Assign the plot_manager to the UI
+        plotMgr = PlotManager(mixerUI.plot)
+        mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
 
         threadServerOSC = threading.Thread(target=self.server.serve_forever, daemon=True)
         threadServerOSC.start()

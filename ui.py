@@ -1,4 +1,3 @@
-# Imports
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
     QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QFormLayout, QButtonGroup,
@@ -9,7 +8,6 @@ import pyqtgraph as pg
 import threading
 import time
 
-# Local imports
 from utils import MixerDiscovery, PlotManager, BandManager
 
 class MixerDiscoveryUI(QDialog):
@@ -75,10 +73,10 @@ class AudioPilotUI(QWidget):
         super().__init__()
         self.mixerAddress = mixerIP
         self.client = client
-        self.plot_manager = None  # Initialize plot_manager
-        self.channel_num = None  # Initialize channel number
-        self.band_manager_thread = None  # To handle the band manager thread
-        self.band_manager_thread_running = threading.Event()  # To track the state of the band manager thread
+        self.plotMgr = None  # initialize plot manager
+        self.channelNum = None  # initialize channel number
+        self.bandManagerThread = None  # to handle the band manager thread
+        self.bandThreadRunning = threading.Event()  # to track the state of the band manager thread
         self.initUI()
 
     def initUI(self):
@@ -123,14 +121,14 @@ class AudioPilotUI(QWidget):
         self.plot.showGrid(x=True, y=True)
         topLayout.addWidget(self.graphWidget)
 
-        # Add a semi-transparent rectangle for dimming effect
+        # semi-transparent rectangle for dimming effect
         self.dimmingRectangle = QGraphicsRectItem(QRectF(self.plot.vb.viewRect()))
-        self.dimmingRectangle.setBrush(pg.mkBrush((0, 0, 0, 100)))  # Semi-transparent black
-        self.dimmingRectangle.setZValue(10)  # Ensure it is on top
+        self.dimmingRectangle.setBrush(pg.mkBrush((0, 0, 0, 100)))  # semi-transparent black
+        self.dimmingRectangle.setZValue(10) # make sure it's on top of the plot
         self.plot.addItem(self.dimmingRectangle)
         self.dimmingRectangle.hide()
 
-        # Right panel: EQ controls and settings
+        # right panel: EQ and pitch controls
         eqControls = QVBoxLayout()
 
         self.eqToggle = QPushButton("EQ On/Off")
@@ -142,7 +140,7 @@ class AudioPilotUI(QWidget):
         gainLabel = QLabel("Gain Level")
         gainLayout.addWidget(gainLabel)
         self.gainDial = QDial()
-        self.gainDial.setRange(-15, 15)  # Gain range in dB
+        self.gainDial.setRange(-15, 15)  # gain range in dB
         self.gainDial.setValue(0)
         gainLayout.addWidget(self.gainDial)
         eqControls.addLayout(gainLayout)
@@ -151,7 +149,7 @@ class AudioPilotUI(QWidget):
         lowcutLabel = QLabel("Lowcut Frequency")
         lowcutLayout.addWidget(lowcutLabel)
         self.lowcutDial = QDial()
-        self.lowcutDial.setRange(20, 400)  # Frequency range in Hz
+        self.lowcutDial.setRange(20, 400)  # frequency range in Hz
         self.lowcutDial.setValue(100)
         lowcutLayout.addWidget(self.lowcutDial)
         eqControls.addLayout(lowcutLayout)
@@ -162,7 +160,7 @@ class AudioPilotUI(QWidget):
         self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
         pitchLayout.addWidget(self.pitchTypeSelector)
         
-        self.pitchToggle = QPushButton("Pitch Correction On/Off")
+        self.pitchToggle = QPushButton("AudioPilot")
         self.pitchToggle.setCheckable(True)
         self.pitchToggle.clicked.connect(self.togglePitchCorrection)
         pitchLayout.addWidget(self.pitchToggle)
@@ -173,13 +171,13 @@ class AudioPilotUI(QWidget):
 
         mainLayout.addLayout(topLayout)
 
-        # Bottom layout for EQ dials
+        # bottom layout for EQ dials
         eqControlsLayout = QHBoxLayout()
         
         freqLayout = QVBoxLayout()
         freqLabel = QLabel("Freq")
         self.freqDial = QDial()
-        self.freqDial.setRange(20, 20000)  # Frequency range in Hz
+        self.freqDial.setRange(20, 20000)  # frequency range in Hz
         self.freqDial.setValue(1000)
         self.freqDial.setFixedSize(50, 50)
         freqLayout.addWidget(freqLabel)
@@ -199,7 +197,7 @@ class AudioPilotUI(QWidget):
         smallGainLayout = QVBoxLayout()
         smallGainLabel = QLabel("Gain")
         self.smallGainDial = QDial()
-        self.smallGainDial.setRange(-12, 12)  # Gain range in dB
+        self.smallGainDial.setRange(-12, 12)  # gain range in dB
         self.smallGainDial.setValue(0)
         self.smallGainDial.setFixedSize(50, 50)
         smallGainLayout.addWidget(smallGainLabel)
@@ -214,21 +212,21 @@ class AudioPilotUI(QWidget):
         self.show()
 
     def redrawPlot(self):
-        if self.plot_manager:
-            self.plot_manager.updatePlot()
+        if self.plotMgr:
+            self.plotMgr.updatePlot()
 
     def showChannelSelector(self):
         self.channelSelectorDialog = ChannelSelectorDialog(self)
         if self.channelSelectorDialog.exec() == QDialog.DialogCode.Accepted:
             self.selectChannelButton.setText(self.channelSelectorDialog.selectedChannel)
-            self.channel_num = int(self.channelSelectorDialog.selectedChannel.split()[1]) - 1
-            self.client.send_message('/-action/setrtasrc', [self.channel_num])
+            self.channelNum = int(self.channelSelectorDialog.selectedChannel.split()[1]) - 1
+            self.client.send_message('/-action/setrtasrc', [self.channelNum])
             # Now start receiving and updating data for the selected channel
             self.startPlotting()
 
     def startPlotting(self):
-        if not self.plot_manager:
-            self.plot_manager = PlotManager(self.plot)
+        if not self.plotMgr:
+            self.plotMgr = PlotManager(self.plot)
         self.timer = QTimer()
         self.timer.timeout.connect(self.redrawPlot)
         self.timer.start(100)
@@ -257,19 +255,19 @@ class AudioPilotUI(QWidget):
             self.stopBandManager()
 
     def startBandManager(self, vocalType):
-        if self.channel_num is not None:
-            self.band_manager_thread_running.set()  # Set the event to start the thread
-            self.band_manager = BandManager(self.client)
-            self.band_manager_thread = threading.Thread(target=self.runBandManager, args=(vocalType, self.channel_num), daemon=True)
-            self.band_manager_thread.start()
+        if self.channelNum is not None:
+            self.bandThreadRunning.set()  # set the event to start the thread
+            self.bandMgr = BandManager(self.client)
+            self.bandManagerThread = threading.Thread(target=self.runBandManager, args=(vocalType, self.channelNum), daemon=True)
+            self.bandManagerThread.start()
 
     def stopBandManager(self):
-        if self.band_manager_thread is not None:
-            self.band_manager_thread_running.clear()  # Clear the event to stop the thread
+        if self.bandManagerThread is not None:
+            self.bandThreadRunning.clear()  # clear the event to stop the thread
 
     def runBandManager(self, vocalType, channel):
-        while self.band_manager_thread_running.is_set():
-            self.band_manager.updateAllBands(vocalType, channel)
+        while self.bandThreadRunning.is_set():
+            self.bandMgr.updateAllBands(vocalType, channel)
             time.sleep(0.3)
 
 class ChannelSelectorDialog(QDialog):
@@ -292,9 +290,9 @@ class ChannelSelectorDialog(QDialog):
         self.setLayout(layout)
 
     def chooseChannel(self):
-        selected_button = self.button_group.checkedButton()
-        if selected_button:
-            self.selectedChannel = selected_button.text()
+        selectedButton = self.button_group.checkedButton()
+        if selectedButton:
+            self.selectedChannel = selectedButton.text()
             self.accept()
 
 class SettingsDialog(QDialog):
@@ -311,7 +309,7 @@ class SettingsDialog(QDialog):
         layout.addRow("Pitch Type:", self.pitchTypeSelector)
 
         self.lowcutDial = QDial()
-        self.lowcutDial.setRange(20, 400)  # Frequency range in Hz
+        self.lowcutDial.setRange(20, 400)  # frequency range in Hz
         self.lowcutDial.setValue(100)
         layout.addRow("Lowcut Frequency:", self.lowcutDial)
 

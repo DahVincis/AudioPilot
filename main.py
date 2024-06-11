@@ -1,4 +1,3 @@
-# Imports
 import sys
 import argparse
 from PyQt6.QtWidgets import QApplication, QDialog
@@ -6,8 +5,7 @@ from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
-# Local imports
-from ui import MixerDiscoveryUI, AudioPilotUI
+from ui import MixerDiscoveryUI
 from osc_handlers import RTASubscriber, FaderHandler
 from utils import ApplicationManager
 

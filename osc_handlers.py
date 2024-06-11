@@ -1,10 +1,5 @@
-# Imports
 import struct
-from pythonosc.dispatcher import Dispatcher
-from pythonosc.udp_client import SimpleUDPClient
-from queue import Queue, Empty
 
-# Local imports
 from Data import frequencies, dataRTA, gainOffset, queueRTA
 
 receivedFirstRTA = False

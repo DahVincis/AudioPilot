@@ -1,7 +1,6 @@
-# hardcoded frequencies based on /meters/15 data
 from queue import Queue
 
-
+# hardcoded frequencies based on /meters/15 data
 frequencies = [
     20, 21, 22, 24, 26, 28, 30, 32, 34, 36,
     39, 42, 45, 48, 52, 55, 59, 63, 68, 73,
@@ -15,6 +14,7 @@ frequencies = [
     10000, 10720, 11490, 12310, 13200, 14140, 15160, 16250, 17410, 18660
 ]
 
+# rta data structure (dict of lists)
 dataRTA = {freq: [-90.0] for freq in frequencies}
 '''
 # Low: 118 to 292 | Low Mid: 313 to 1090 | High Mid: 1170 to 5000 | High: 5360 to 18660
@@ -373,6 +373,7 @@ eqGainValues = {   # gain:gain_id   -15.0 to 15.0
     15.0:  1.00
 }
 
+# Define band ranges for RTA
 bandsRangeRTA = {
     'Low': (136, 385),
     'Low Mid': (412, 1090),
@@ -383,7 +384,7 @@ bandsRangeRTA = {
 # offest for dB values
 gainOffset = 38
 
-# Global variables
+# global variables
 queueRTA = Queue()
 receivedFirstRTA = False
 bars = {}
