@@ -45,7 +45,7 @@ class MixerManager:
     def keepMixerAwake(self):
         while True:
             self.client.send_message('/xremote', None)
-            self.client.send_message('/xinfo', None)
+            #self.client.send_message('/xinfo', None)
             time.sleep(3)
 
 class PlotManager:
@@ -233,7 +233,7 @@ class BandManager:
 class MixerDiscovery:
     def __init__(self, port=10023):
         self.port = port
-        self.subnets = ["192.168.10", "192.168.1"]
+        self.subnets = ["192.168.10", "192.168.1", "192.168.56"]
 
     def checkMixerIP(self, ip):
         try:
