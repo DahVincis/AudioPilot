@@ -65,6 +65,7 @@ class MixerDiscoveryUI(QDialog):
         self.infoLabel.setText(self.discoveryPhrases[self.animationIndex])
 
     def chooseMixer(self, ip):
+        self.mixerScanner.stopDiscovery()  # stop discovery process
         self.selectedMixerIp = ip
         self.accept()
 

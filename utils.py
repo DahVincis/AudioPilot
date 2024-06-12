@@ -16,7 +16,7 @@ class ApplicationManager:
         self.client = client
         self.server = server
 
-    def run(self, mixer_ip):
+    def run(self, mixerIP):
         from osc_handlers import RTASubscriber
         mixerManager = MixerManager(self.client)
         threadKeepAlive = threading.Thread(target=mixerManager.keepMixerAwake, daemon=True)
@@ -27,8 +27,8 @@ class ApplicationManager:
         threadRTASub.start()
 
         app = QApplication([])
-        from ui import AudioPilotUI  # aocal import to avoid circular dependency
-        mixerUI = AudioPilotUI(mixer_ip, self.client)
+        from ui import AudioPilotUI  # local import to avoid circular dependency
+        mixerUI = AudioPilotUI(mixerIP, self.client)
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
@@ -45,13 +45,18 @@ class MixerManager:
     def keepMixerAwake(self):
         while True:
             self.client.send_message('/xremote', None)
-            #self.client.send_message('/xinfo', None)
-            time.sleep(3)
+            time.sleep(9)
 
 class PlotManager:
     def __init__(self, plot):
         self.plot = plot
         self.bars = {}
+        self.initializeBars()
+
+    def initializeBars(self):
+        # Initialize bars with default values
+        for freq in frequencies:
+            self.bars[freq] = self.plot.plot([freq, freq], [-90, -90], pen=pg.mkPen('b', width=3))
 
     def updatePlot(self):
         try:
@@ -59,21 +64,35 @@ class PlotManager:
             threshUpper = -10
             threshMid = -18
             threshLower = -45
+            
+            # Prepare data for batch update
+            freqData = []
+            dbData = []
+            colors = []
+
             for freq in frequencies:
                 dbValues = latestData.get(freq, [-90])
                 dbLatest = dbValues[-1] if dbValues else -90
+                if dbLatest == -90:
+                    continue  # Skip if no audio
+
                 color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'g' if dbLatest >= threshLower <= threshMid else 'b'
-                if freq in self.bars:
-                    self.bars[freq].setData([freq, freq], [dbLatest, -90])
-                    self.bars[freq].setPen(pg.mkPen(color, width=3))
+                freqData.append([freq, freq])
+                dbData.append([dbLatest, -90])
+                colors.append(color)
+
+            # Update all bars in a batch
+            for i, freq in enumerate(frequencies):
+                if freq in freqData:
+                    self.bars[freq].setData(freqData[i], dbData[i], pen=pg.mkPen(colors[i], width=3))
                 else:
-                    self.bars[freq] = self.plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
+                    self.bars[freq].setData([freq, freq], [-90, -90], pen=pg.mkPen('b', width=3))
+
         except Empty:
             pass
 
     def setLogTicks(self):
-        ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
-        labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
+        labelTicks = [(freq, f"{int(freq)} Hz") for freq in frequencies]
         self.plot.getAxis('bottom').setTicks([labelTicks])
 
 class BandManager:
@@ -234,8 +253,11 @@ class MixerDiscovery:
     def __init__(self, port=10023):
         self.port = port
         self.subnets = ["192.168.10", "192.168.1", "192.168.56"]
+        self.discovery_running = True  # Add a flag to control discovery
 
     def checkMixerIP(self, ip):
+        if not self.discovery_running:
+            return None
         try:
             tempClient = SimpleUDPClient(ip, self.port)
             tempClient.send_message('/xinfo', None)
@@ -249,12 +271,17 @@ class MixerDiscovery:
     def discoverMixers(self):
         from osc_handlers import FaderHandler
         discIPs = {}
-        with ThreadPoolExecutor(max_workers=100) as executor:
+        with ThreadPoolExecutor(max_workers=50) as executor:
             futures = {executor.submit(self.checkMixerIP, f"{subnet}.{i}"): f"{subnet}.{i}" for subnet in self.subnets for i in range(256)}
             for future in as_completed(futures):
+                if not self.discovery_running:
+                    break
                 result = future.result()
                 if result:
                     ip, rawData = result
                     details = FaderHandler().handlerXInfo(rawData)
                     discIPs[ip] = details
         return discIPs
+
+    def stopDiscovery(self):
+        self.discovery_running = False  # Method to stop discovery
