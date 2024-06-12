@@ -52,6 +52,7 @@ class PlotManager:
         self.plot = plot
         self.bars = {}
         self.initializeBars()
+        self.setCustomTicks()
 
     def initializeBars(self):
         # Initialize bars with default values
@@ -91,8 +92,10 @@ class PlotManager:
         except Empty:
             pass
 
-    def setLogTicks(self):
-        labelTicks = [(freq, f"{int(freq)} Hz") for freq in frequencies]
+    def setCustomTicks(self):
+        # Select a subset of frequencies for the x-axis ticks
+        major_ticks = [20, 40, 60, 80, 100, 200, 300, 400, 600, 800, 1000, 2000, 3000, 4000, 5000, 8000, 10000, 20000]
+        labelTicks = [(freq, f"{freq/1000:.1f}kHz" if freq >= 1000 else f"{int(freq)} Hz") for freq in major_ticks]
         self.plot.getAxis('bottom').setTicks([labelTicks])
 
 class BandManager:
