@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QApplication
 from queue import Empty
 import sys
 from pythonosc.udp_client import SimpleUDPClient
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import select
 
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
@@ -45,32 +45,35 @@ class MixerManager:
     def keepMixerAwake(self):
         while True:
             self.client.send_message('/xremote', None)
-            time.sleep(9)
+            time.sleep(3)
 
 class PlotManager:
     def __init__(self, plot):
         self.plot = plot
         self.bars = {}
-        self.initializeBars()
-        self.setCustomTicks()
+        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.lock = threading.Lock()  # Add a lock to manage access to shared resources
+        self.timer = pg.QtCore.QTimer()
+        self.timer.timeout.connect(self.updatePlot)
+        self.plottingActive = False
 
-    def initializeBars(self):
-        # Initialize bars with default values
-        for freq in frequencies:
-            self.bars[freq] = self.plot.plot([freq, freq], [-90, -90], pen=pg.mkPen('b', width=3))
+    def start(self):
+        if not self.plottingActive:
+            print("Starting the plotting timer...")
+            self.plottingActive = True
+            self.timer.start(100)  # Set the timer to trigger every 100 ms
 
     def updatePlot(self):
+        future = self.executor.submit(self._processPlotData)
+        future.add_done_callback(self._updatePlotCallback)
+
+    def _processPlotData(self):
         try:
             latestData = queueRTA.get_nowait()
             threshUpper = -10
             threshMid = -18
             threshLower = -45
-            
-            # Prepare data for batch update
-            freqData = []
-            dbData = []
-            colors = []
-
+            plot_data = []
             for freq in frequencies:
                 dbValues = latestData.get(freq, [-90])
                 dbLatest = dbValues[-1] if dbValues else -90
@@ -78,25 +81,39 @@ class PlotManager:
                     continue  # Skip if no audio
 
                 color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'g' if dbLatest >= threshLower <= threshMid else 'b'
-                freqData.append([freq, freq])
-                dbData.append([dbLatest, -90])
-                colors.append(color)
-
-            # Update all bars in a batch
-            for i, freq in enumerate(frequencies):
-                if freq in freqData:
-                    self.bars[freq].setData(freqData[i], dbData[i], pen=pg.mkPen(colors[i], width=3))
-                else:
-                    self.bars[freq].setData([freq, freq], [-90, -90], pen=pg.mkPen('b', width=3))
-
+                plot_data.append((freq, dbLatest, color))
+            return plot_data
         except Empty:
-            pass
+            return []
+
+    def _updatePlotCallback(self, future):
+        try:
+            plot_data = future.result()
+            self._updatePlotUI(plot_data)
+        except Exception as e:
+            print(f"Error updating plot: {e}")
+
+    def _updatePlotUI(self, plot_data):
+        with self.lock:  # Use the lock to manage access to shared resources
+            for freq, dbLatest, color in plot_data:
+                if freq in self.bars:
+                    self.bars[freq].setData([freq, freq], [dbLatest, -90])
+                    self.bars[freq].setPen(pg.mkPen(color, width=3))
+                else:
+                    self.bars[freq] = self.plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
 
     def setCustomTicks(self):
         # Select a subset of frequencies for the x-axis ticks
         major_ticks = [20, 40, 60, 80, 100, 200, 300, 400, 600, 800, 1000, 2000, 3000, 4000, 5000, 8000, 10000, 20000]
         labelTicks = [(freq, f"{freq/1000:.1f}kHz" if freq >= 1000 else f"{int(freq)} Hz") for freq in major_ticks]
         self.plot.getAxis('bottom').setTicks([labelTicks])
+
+    def shutdown(self):
+        if self.plottingActive:
+            print("Stopping the plotting timer and shutting down the executor...")
+            self.plottingActive = False
+            self.timer.stop()
+            self.executor.shutdown(wait=True)
 
 class BandManager:
     def __init__(self, client):
@@ -243,14 +260,6 @@ class BandManager:
             qValue = self.calculateQValue(targetFreq, band)
             qIDValue = self.getClosestQIDValue(qValue)
             self.sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)
-
-    def threadUpdateBand(self, vocalType, channel):
-        print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
-        while True:
-            if not self.band_manager_thread_running:
-                break
-            self.updateAllBands(vocalType, channel)
-            time.sleep(0.3)
 
 class MixerDiscovery:
     def __init__(self, port=10023):
