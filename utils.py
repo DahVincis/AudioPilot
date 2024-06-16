@@ -16,7 +16,7 @@ class ApplicationManager:
         self.client = client
         self.server = server
 
-    def run(self, mixerIP):
+    def run(self, mixer_ip):
         from osc_handlers import RTASubscriber
         mixerManager = MixerManager(self.client)
         threadKeepAlive = threading.Thread(target=mixerManager.keepMixerAwake, daemon=True)
@@ -28,7 +28,7 @@ class ApplicationManager:
 
         app = QApplication([])
         from ui import AudioPilotUI  # local import to avoid circular dependency
-        mixerUI = AudioPilotUI(mixerIP, self.client)
+        mixerUI = AudioPilotUI(mixer_ip, self.client)
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
@@ -77,9 +77,6 @@ class PlotManager:
             for freq in frequencies:
                 dbValues = latestData.get(freq, [-90])
                 dbLatest = dbValues[-1] if dbValues else -90
-                if dbLatest == -90:
-                    continue  # Skip if no audio
-
                 color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'g' if dbLatest >= threshLower <= threshMid else 'b'
                 plot_data.append((freq, dbLatest, color))
             return plot_data
@@ -102,10 +99,9 @@ class PlotManager:
                 else:
                     self.bars[freq] = self.plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
 
-    def setCustomTicks(self):
-        # Select a subset of frequencies for the x-axis ticks
-        major_ticks = [20, 40, 60, 80, 100, 200, 300, 400, 600, 800, 1000, 2000, 3000, 4000, 5000, 8000, 10000, 20000]
-        labelTicks = [(freq, f"{freq/1000:.1f}kHz" if freq >= 1000 else f"{int(freq)} Hz") for freq in major_ticks]
+    def setLogTicks(self):
+        ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
+        labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
         self.plot.getAxis('bottom').setTicks([labelTicks])
 
     def shutdown(self):
@@ -265,11 +261,8 @@ class MixerDiscovery:
     def __init__(self, port=10023):
         self.port = port
         self.subnets = ["192.168.10", "192.168.1", "192.168.56"]
-        self.discovery_running = True  # Add a flag to control discovery
 
     def checkMixerIP(self, ip):
-        if not self.discovery_running:
-            return None
         try:
             tempClient = SimpleUDPClient(ip, self.port)
             tempClient.send_message('/xinfo', None)
@@ -283,17 +276,12 @@ class MixerDiscovery:
     def discoverMixers(self):
         from osc_handlers import FaderHandler
         discIPs = {}
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        with ThreadPoolExecutor(max_workers=100) as executor:
             futures = {executor.submit(self.checkMixerIP, f"{subnet}.{i}"): f"{subnet}.{i}" for subnet in self.subnets for i in range(256)}
             for future in as_completed(futures):
-                if not self.discovery_running:
-                    break
                 result = future.result()
                 if result:
                     ip, rawData = result
                     details = FaderHandler().handlerXInfo(rawData)
                     discIPs[ip] = details
         return discIPs
-
-    def stopDiscovery(self):
-        self.discovery_running = False  # Method to stop discovery
