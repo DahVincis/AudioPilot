@@ -61,7 +61,6 @@ class MixerDiscoveryUI(QDialog):
             row += 1
 
     def chooseMixer(self, ip):
-        self.mixerScanner.stopDiscovery()  # stop discovery process
         self.selectedMixerIp = ip
         self.accept()
 
@@ -198,9 +197,6 @@ class AudioPilotUI(QWidget):
 
         self.setWindowTitle('Audio Mixer')
         self.show()
-
-        # Initialize PlotManager with the plot and set custom ticks
-        self.plotMgr = PlotManager(self.plot)
 
     def redrawPlot(self):
         if self.plotMgr:
