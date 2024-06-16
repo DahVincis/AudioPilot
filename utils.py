@@ -55,7 +55,13 @@ class PlotManager:
         self.lock = threading.Lock()  # Add a lock to manage access to shared resources
         self.timer = pg.QtCore.QTimer()
         self.timer.timeout.connect(self.updatePlot)
-        self.timer.start(100)  # Set the timer to trigger every 100 ms
+        self.plottingActive = False
+
+    def start(self):
+        if not self.plottingActive:
+            print("Starting the plotting timer...")
+            self.plottingActive = True
+            self.timer.start(100)  # Set the timer to trigger every 100 ms
 
     def updatePlot(self):
         future = self.executor.submit(self._processPlotData)
@@ -99,8 +105,11 @@ class PlotManager:
         self.plot.getAxis('bottom').setTicks([labelTicks])
 
     def shutdown(self):
-        self.timer.stop()
-        self.executor.shutdown(wait=True)
+        if self.plottingActive:
+            print("Stopping the plotting timer and shutting down the executor...")
+            self.plottingActive = False
+            self.timer.stop()
+            self.executor.shutdown(wait=True)
 
 class BandManager:
     def __init__(self, client):
@@ -247,14 +256,6 @@ class BandManager:
             qValue = self.calculateQValue(targetFreq, band)
             qIDValue = self.getClosestQIDValue(qValue)
             self.sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)
-
-    def threadUpdateBand(self, vocalType, channel):
-        print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
-        while True:
-            if not self.band_manager_thread_running:
-                break
-            self.updateAllBands(vocalType, channel)
-            time.sleep(0.3)
 
 class MixerDiscovery:
     def __init__(self, port=10023):

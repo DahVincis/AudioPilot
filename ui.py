@@ -173,7 +173,7 @@ class AudioPilotUI(QWidget):
 
         qLayout = QVBoxLayout()
         qLabel = QLabel("Q")
-        self.qDial = QDial()
+        self.qDial = QDial()  # Ensure qDial is initialized
         self.qDial.setRange(1, 10)
         self.qDial.setValue(5)
         self.qDial.setFixedSize(50, 50)
@@ -211,8 +211,17 @@ class AudioPilotUI(QWidget):
             self.startPlotting()
 
     def startPlotting(self):
-        if not self.plotMgr:
-            self.plotMgr = PlotManager(self.plot)
+        if self.channelNum is not None:
+            if not self.plotMgr:
+                print("Starting Plot Manager...")
+                self.plotMgr = PlotManager(self.plot)
+            self.plotMgr.start()
+
+    def stopPlotting(self):
+        if self.plotMgr:
+            print("Stopping Plot Manager...")
+            self.plotMgr.shutdown()
+            self.plotMgr = None
 
     def toggleMute(self):
         if self.toggleMuteButton.isChecked():
