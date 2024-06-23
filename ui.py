@@ -120,10 +120,12 @@ class AudioPilotUI(QWidget):
 
         eqControls = QVBoxLayout()
 
-        self.eqToggle = QPushButton("EQ On/Off")
-        self.eqToggle.setCheckable(True)
-        self.eqToggle.clicked.connect(self.toggleEQ)
-        eqControls.addWidget(self.eqToggle)
+        self.rtaToggle = QPushButton("RTA")
+        self.rtaToggle.setCheckable(True)
+        self.rtaToggle.setStyleSheet("background-color: gray")
+        self.rtaToggle.setChecked(False)
+        self.rtaToggle.clicked.connect(self.togglePlotUpdates)
+        eqControls.addWidget(self.rtaToggle)
 
         gainLayout = QVBoxLayout()
         gainLabel = QLabel("Gain Level")
@@ -150,6 +152,8 @@ class AudioPilotUI(QWidget):
 
         self.pitchToggle = QPushButton("AudioPilot")
         self.pitchToggle.setCheckable(True)
+        self.pitchToggle.setStyleSheet("background-color: gray")
+        self.pitchToggle.setChecked(False)
         self.pitchToggle.clicked.connect(self.togglePitchCorrection)
         pitchLayout.addWidget(self.pitchToggle)
 
@@ -198,6 +202,26 @@ class AudioPilotUI(QWidget):
         self.setWindowTitle('Audio Mixer')
         self.show()
 
+        # Initialize PlotManager and set custom ticks
+        self.plotMgr = PlotManager(self.plot)
+        self.plotMgr.setLogTicks()
+
+    def togglePlotUpdates(self):
+        if self.rtaToggle.isChecked():
+            self.rtaToggle.setStyleSheet("background-color: green")
+            if not self.plotMgr.plottingActive:
+                self.plotMgr.start()
+        else:
+            self.rtaToggle.setStyleSheet("background-color: gray")
+            if self.plotMgr.plottingActive:
+                self.plotMgr.shutdown()
+                self.clearPlot()
+
+    def clearPlot(self):
+        if self.plotMgr:
+            for bar in self.plotMgr.bars.values():
+                bar.clear()
+
     def redrawPlot(self):
         if self.plotMgr:
             self.plotMgr.updatePlot()
@@ -215,7 +239,9 @@ class AudioPilotUI(QWidget):
             if not self.plotMgr:
                 print("Starting Plot Manager...")
                 self.plotMgr = PlotManager(self.plot)
-            self.plotMgr.start()
+                self.plotMgr.setLogTicks()
+            if self.rtaToggle.isChecked():
+                self.plotMgr.start()
 
     def stopPlotting(self):
         if self.plotMgr:
@@ -231,19 +257,13 @@ class AudioPilotUI(QWidget):
             self.toggleMuteButton.setStyleSheet("background-color: gray")
             print("Channel is unmuted.")
 
-    def toggleEQ(self):
-        if self.eqToggle.isChecked():
-            self.dimmingRectangle.hide()
-            print("EQ is on.")
-        else:
-            self.dimmingRectangle.show()
-            print("EQ is off.")
-
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
+            self.pitchToggle.setStyleSheet("background-color: orange")
             vocalType = self.pitchTypeSelector.currentText()
             self.startBandManager(vocalType)
         else:
+            self.pitchToggle.setStyleSheet("background-color: gray")
             self.stopBandManager()
 
     def startBandManager(self, vocalType):

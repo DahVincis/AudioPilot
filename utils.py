@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 from queue import Empty
 import sys
 from pythonosc.udp_client import SimpleUDPClient
@@ -47,25 +48,31 @@ class MixerManager:
             self.client.send_message('/xremote', None)
             time.sleep(3)
 
-class PlotManager:
+class PlotManager(QObject):
+    update_signal = pyqtSignal(list)
+
     def __init__(self, plot):
+        super().__init__()
         self.plot = plot
         self.bars = {}
-        self.executor = ThreadPoolExecutor(max_workers=20)
-        self.lock = threading.Lock()  # Add a lock to manage access to shared resources
-        self.timer = pg.QtCore.QTimer()
+        self.executor = None
+        self.lock = threading.Lock()
+        self.timer = QTimer()
         self.timer.timeout.connect(self.updatePlot)
         self.plottingActive = False
+        self.update_signal.connect(self._updatePlotUI)
 
     def start(self):
         if not self.plottingActive:
             print("Starting the plotting timer...")
+            self.executor = ThreadPoolExecutor(max_workers=20)
             self.plottingActive = True
-            self.timer.start(100)  # Set the timer to trigger every 100 ms
+            self.timer.start(200)
 
     def updatePlot(self):
-        future = self.executor.submit(self._processPlotData)
-        future.add_done_callback(self._updatePlotCallback)
+        if self.executor:
+            future = self.executor.submit(self._processPlotData)
+            future.add_done_callback(self._updatePlotCallback)
 
     def _processPlotData(self):
         try:
@@ -86,12 +93,12 @@ class PlotManager:
     def _updatePlotCallback(self, future):
         try:
             plot_data = future.result()
-            self._updatePlotUI(plot_data)
+            self.update_signal.emit(plot_data)
         except Exception as e:
             print(f"Error updating plot: {e}")
 
     def _updatePlotUI(self, plot_data):
-        with self.lock:  # Use the lock to manage access to shared resources
+        with self.lock:
             for freq, dbLatest, color in plot_data:
                 if freq in self.bars:
                     self.bars[freq].setData([freq, freq], [dbLatest, -90])
@@ -100,16 +107,23 @@ class PlotManager:
                     self.bars[freq] = self.plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
 
     def setLogTicks(self):
-        ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
-        labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
-        self.plot.getAxis('bottom').setTicks([labelTicks])
+        custom_ticks = [
+            (20, "20"), (40, "40"), (60, "60"), (80, "80"), (100, "100"),
+            (200, "200"), (300, "300"), (400, "400"), (600, "600"), (800, "800"),
+            (1000, "1k"), (2000, "2k"), (3000, "3k"), (4000, "4k"), (5000, "5k"),
+            (6000, "6k"), (7000, "7k"), (8000, "8k"), (9000, "9k"), (10000, "10k"),
+            (20000, "20k")
+        ]
+        self.plot.getAxis('bottom').setTicks([custom_ticks])
 
     def shutdown(self):
         if self.plottingActive:
             print("Stopping the plotting timer and shutting down the executor...")
             self.plottingActive = False
             self.timer.stop()
-            self.executor.shutdown(wait=True)
+            if self.executor:
+                self.executor.shutdown(wait=True)
+                self.executor = None
 
 class BandManager:
     def __init__(self, client):
