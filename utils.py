@@ -51,7 +51,7 @@ class PlotManager:
     def __init__(self, plot):
         self.plot = plot
         self.bars = {}
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.executor = ThreadPoolExecutor(max_workers=20)
         self.lock = threading.Lock()  # Add a lock to manage access to shared resources
         self.timer = pg.QtCore.QTimer()
         self.timer.timeout.connect(self.updatePlot)
