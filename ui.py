@@ -1,9 +1,10 @@
+import sys
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
-    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QFormLayout, QButtonGroup,
-    QGraphicsRectItem,
+    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QFormLayout, QButtonGroup, QGraphicsRectItem
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QRectF, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QRectF, pyqtSignal, QThread, QSize
+from PyQt6.QtGui import QPainter, QColor
 import pyqtgraph as pg
 import threading
 import time
@@ -55,31 +56,64 @@ class MixerDiscoveryUI(QDialog):
         for ip, details in availableMixers.items():
             mixerLabel = QLabel(f"Mixer at {ip} - {details}")
             mixerButton = QPushButton("Select")
-            mixerButton.clicked.connect(lambda _, ip=ip: self.chooseMixer(ip))
+            mixerButton.clicked.connect(lambda _, ip=ip, name=details.split('|')[1].strip(): self.chooseMixer(ip, name))
             self.mixerGridLayout.addWidget(mixerLabel, row, 0)
             self.mixerGridLayout.addWidget(mixerButton, row, 1)
             row += 1
 
-    def chooseMixer(self, ip):
+    def chooseMixer(self, ip, name):
         self.selectedMixerIp = ip
+        self.selectedMixerName = name
         self.accept()
 
+class CustomFader(QSlider):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setRange(-90, 10)
+        self.setValue(0)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        tick_color = QColor(0, 0, 0)  # Black color for ticks
+        painter.setPen(tick_color)
+
+        rect = self.rect()
+        interval = (rect.height() - 20) / (self.maximum() - self.minimum())
+
+        # Define the positions and values for the labels
+        tick_positions = [-90, -70, -50, -40, -30, -20, -10, -5, 0, 5, 10]
+        for tick in tick_positions:
+            y = rect.height() - ((tick - self.minimum()) * interval) - 10
+            painter.drawLine(30, int(y), rect.width(), int(y))  # Draw line across the fader
+            painter.drawText(5, int(y) + 5, str(tick))  # Draw the label to the left of the tick
+
+        painter.end()
+
+    def sizeHint(self):
+        return QSize(80, 200)  # Increase width to ensure labels fit
+
 class AudioPilotUI(QWidget):
-    def __init__(self, mixerIP, client):
+    def __init__(self, mixerName, client):
         super().__init__()
-        self.mixerAddress = mixerIP
+        self.mixerName = mixerName
         self.client = client
         self.plotMgr = None
         self.channelNum = None
         self.bandManagerThread = None
         self.bandThreadRunning = threading.Event()
+        self.isMuted = True  # Initial state is muted
         self.initUI()
 
     def initUI(self):
+        self.setWindowTitle('Audio Mixer')
+        self.setGeometry(100, 100, 1280, 768)  # Adjust the initial window size
+
         mainLayout = QVBoxLayout()
 
         headerLayout = QHBoxLayout()
-        self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerAddress}")
+        self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerName}")
         headerLayout.addWidget(self.mixerLabel)
         mainLayout.addLayout(headerLayout)
 
@@ -89,12 +123,11 @@ class AudioPilotUI(QWidget):
 
         self.toggleMuteButton = QPushButton("Mute")
         self.toggleMuteButton.setCheckable(True)
+        self.toggleMuteButton.setStyleSheet("background-color: red")  # Initial state
         self.toggleMuteButton.clicked.connect(self.toggleMute)
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
-        self.fader = QSlider(Qt.Orientation.Vertical)
-        self.fader.setRange(-90, 10)
-        self.fader.setValue(0)
+        self.fader = CustomFader(Qt.Orientation.Vertical)
         leftPanelLayout.addWidget(self.fader)
 
         self.selectChannelButton = QPushButton("Select Channel")
@@ -177,7 +210,7 @@ class AudioPilotUI(QWidget):
 
         qLayout = QVBoxLayout()
         qLabel = QLabel("Q")
-        self.qDial = QDial()  # Ensure qDial is initialized
+        self.qDial = QDial()
         self.qDial.setRange(1, 10)
         self.qDial.setValue(5)
         self.qDial.setFixedSize(50, 50)
@@ -201,10 +234,6 @@ class AudioPilotUI(QWidget):
 
         self.setWindowTitle('Audio Mixer')
         self.show()
-
-        # Initialize PlotManager and set custom ticks
-        self.plotMgr = PlotManager(self.plot)
-        self.plotMgr.setLogTicks()
 
     def togglePlotUpdates(self):
         if self.rtaToggle.isChecked():
@@ -250,12 +279,15 @@ class AudioPilotUI(QWidget):
             self.plotMgr = None
 
     def toggleMute(self):
-        if self.toggleMuteButton.isChecked():
-            self.toggleMuteButton.setStyleSheet("background-color: red")
-            print("Channel is muted.")
-        else:
-            self.toggleMuteButton.setStyleSheet("background-color: gray")
-            print("Channel is unmuted.")
+        if self.channelNum is not None:  # Ensure channelNum is set
+            if self.toggleMuteButton.isChecked():
+                self.client.send_message(f'/ch/{self.channelNum}/mix/on', 0)
+                self.toggleMuteButton.setStyleSheet("background-color: red")
+                print(f"Channel {self.channelNum} is muted.")
+            else:
+                self.client.send_message(f'/ch/{self.channelNum}/mix/on', 1)
+                self.toggleMuteButton.setStyleSheet("background-color: gray")
+                print(f"Channel {self.channelNum} is unmuted.")
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():

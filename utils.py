@@ -13,11 +13,12 @@ import select
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
 
 class ApplicationManager:
-    def __init__(self, client, server):
+    def __init__(self, client, server, mixer_name):
         self.client = client
         self.server = server
+        self.mixer_name = mixer_name
 
-    def run(self, mixer_ip):
+    def run(self):
         from osc_handlers import RTASubscriber
         mixerManager = MixerManager(self.client)
         threadKeepAlive = threading.Thread(target=mixerManager.keepMixerAwake, daemon=True)
@@ -29,7 +30,7 @@ class ApplicationManager:
 
         app = QApplication([])
         from ui import AudioPilotUI  # local import to avoid circular dependency
-        mixerUI = AudioPilotUI(mixer_ip, self.client)
+        mixerUI = AudioPilotUI(self.mixer_name, self.client)
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
