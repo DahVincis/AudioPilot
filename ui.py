@@ -12,7 +12,7 @@ import time
 from utils import MixerDiscovery, PlotManager, BandManager
 
 class MixerDiscoveryWorker(QThread):
-    mixers_discovered = pyqtSignal(dict)
+    mixersFound = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
@@ -20,7 +20,7 @@ class MixerDiscoveryWorker(QThread):
 
     def run(self):
         availableMixers = self.mixerScanner.discoverMixers()
-        self.mixers_discovered.emit(availableMixers)
+        self.mixersFound.emit(availableMixers)
 
 class MixerDiscoveryUI(QDialog):
     def __init__(self):
@@ -29,7 +29,7 @@ class MixerDiscoveryUI(QDialog):
         self.setGeometry(100, 100, 400, 200)
         self.initUI()
         self.mixerWorker = MixerDiscoveryWorker()
-        self.mixerWorker.mixers_discovered.connect(self.updateMixerGrid)
+        self.mixerWorker.mixersFound.connect(self.updateMixerGrid)
         self.mixerWorker.start()
 
     def initUI(self):
@@ -76,8 +76,8 @@ class CustomFader(QSlider):
         super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        tick_color = QColor(0, 0, 0)  # Black color for ticks
-        painter.setPen(tick_color)
+        tickColor = QColor(0, 0, 0)  # Black color for ticks
+        painter.setPen(tickColor)
 
         rect = self.rect()
         interval = (rect.height() - 20) / (self.maximum() - self.minimum())
@@ -107,7 +107,7 @@ class AudioPilotUI(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Audio Mixer')
+        self.setWindowTitle('Audio Pilot')
         self.setGeometry(100, 100, 1280, 768)  # Adjust the initial window size
 
         mainLayout = QVBoxLayout()
@@ -232,7 +232,7 @@ class AudioPilotUI(QWidget):
 
         self.setLayout(mainLayout)
 
-        self.setWindowTitle('Audio Mixer')
+        self.setWindowTitle('Audio Pilot')
         self.show()
 
     def togglePlotUpdates(self):
@@ -281,11 +281,11 @@ class AudioPilotUI(QWidget):
     def toggleMute(self):
         if self.channelNum is not None:  # Ensure channelNum is set
             if self.toggleMuteButton.isChecked():
-                self.client.send_message(f'/ch/{self.channelNum}/mix/on', 0)
+                self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 0)
                 self.toggleMuteButton.setStyleSheet("background-color: red")
                 print(f"Channel {self.channelNum} is muted.")
             else:
-                self.client.send_message(f'/ch/{self.channelNum}/mix/on', 1)
+                self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 1)
                 self.toggleMuteButton.setStyleSheet("background-color: gray")
                 print(f"Channel {self.channelNum} is unmuted.")
 

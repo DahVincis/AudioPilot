@@ -13,10 +13,10 @@ import select
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
 
 class ApplicationManager:
-    def __init__(self, client, server, mixer_name):
+    def __init__(self, client, server, mixerName):
         self.client = client
         self.server = server
-        self.mixer_name = mixer_name
+        self.mixerName = mixerName
 
     def run(self):
         from osc_handlers import RTASubscriber
@@ -30,7 +30,7 @@ class ApplicationManager:
 
         app = QApplication([])
         from ui import AudioPilotUI  # local import to avoid circular dependency
-        mixerUI = AudioPilotUI(self.mixer_name, self.client)
+        mixerUI = AudioPilotUI(self.mixerName, self.client)
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
@@ -50,7 +50,7 @@ class MixerManager:
             time.sleep(3)
 
 class PlotManager(QObject):
-    update_signal = pyqtSignal(list)
+    plotDataUpdated = pyqtSignal(list)
 
     def __init__(self, plot):
         super().__init__()
@@ -61,7 +61,7 @@ class PlotManager(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.updatePlot)
         self.plottingActive = False
-        self.update_signal.connect(self._updatePlotUI)
+        self.plotDataUpdated.connect(self._updatePlotUI)
 
     def start(self):
         if not self.plottingActive:
@@ -93,8 +93,8 @@ class PlotManager(QObject):
 
     def _updatePlotCallback(self, future):
         try:
-            plot_data = future.result()
-            self.update_signal.emit(plot_data)
+            plotData = future.result()
+            self.plotDataUpdated.emit(plotData)
         except Exception as e:
             print(f"Error updating plot: {e}")
 
@@ -108,14 +108,14 @@ class PlotManager(QObject):
                     self.bars[freq] = self.plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
 
     def setLogTicks(self):
-        custom_ticks = [
+        customTicks = [
             (20, "20"), (40, "40"), (60, "60"), (80, "80"), (100, "100"),
             (200, "200"), (300, "300"), (400, "400"), (600, "600"), (800, "800"),
             (1000, "1k"), (2000, "2k"), (3000, "3k"), (4000, "4k"), (5000, "5k"),
             (6000, "6k"), (7000, "7k"), (8000, "8k"), (9000, "9k"), (10000, "10k"),
             (20000, "20k")
         ]
-        self.plot.getAxis('bottom').setTicks([custom_ticks])
+        self.plot.getAxis('bottom').setTicks([customTicks])
 
     def shutdown(self):
         if self.plottingActive:
