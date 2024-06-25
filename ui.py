@@ -1,14 +1,26 @@
+import sys
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
-    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QFormLayout, QButtonGroup,
-    QGraphicsRectItem,
+    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QFormLayout, QButtonGroup, QGraphicsRectItem
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QRectF
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QRectF, pyqtSignal, QThread, QSize
+from PyQt6.QtGui import QPainter, QColor
 import pyqtgraph as pg
 import threading
 import time
 
 from utils import MixerDiscovery, PlotManager, BandManager
+
+class MixerDiscoveryWorker(QThread):
+    mixersFound = pyqtSignal(dict)
+
+    def __init__(self):
+        super().__init__()
+        self.mixerScanner = MixerDiscovery()
+
+    def run(self):
+        availableMixers = self.mixerScanner.discoverMixers()
+        self.mixersFound.emit(availableMixers)
 
 class MixerDiscoveryUI(QDialog):
     def __init__(self):
@@ -16,16 +28,9 @@ class MixerDiscoveryUI(QDialog):
         self.setWindowTitle("Mixer Discovery")
         self.setGeometry(100, 100, 400, 200)
         self.initUI()
-        self.mixerScanner = MixerDiscovery()
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.scanAndUpdateMixerGrid)
-        self.timer.start(1000)  # Update every second
-        self.availableMixers = {}
-        self.discoveryPhrases = ["Searching for mixers.", "Searching for mixers..", "Searching for mixers..."]
-        self.animationIndex = 0
-        self.searchingTimer = QTimer()
-        self.searchingTimer.timeout.connect(self.updateSearchingAnimation)
-        self.searchingTimer.start(500)  # Update every half second
+        self.mixerWorker = MixerDiscoveryWorker()
+        self.mixerWorker.mixersFound.connect(self.updateMixerGrid)
+        self.mixerWorker.start()
 
     def initUI(self):
         self.layout = QVBoxLayout()
@@ -35,74 +40,94 @@ class MixerDiscoveryUI(QDialog):
         self.layout.addLayout(self.mixerGridLayout)
         self.setLayout(self.layout)
 
-    @pyqtSlot()
-    def scanAndUpdateMixerGrid(self):
-        self.availableMixers = self.mixerScanner.discoverMixers()
-        self.updateMixerGrid()
-
-    def updateMixerGrid(self):
+    @pyqtSlot(dict)
+    def updateMixerGrid(self, availableMixers):
         for i in reversed(range(self.mixerGridLayout.count())): 
             widget = self.mixerGridLayout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
 
-        if not self.availableMixers:
-            self.infoLabel.setText(self.discoveryPhrases[self.animationIndex])
+        if not availableMixers:
+            self.infoLabel.setText("No mixers found.")
         else:
             self.infoLabel.setText("Select a mixer from the list below:")
 
         row = 0
-        for ip, details in self.availableMixers.items():
+        for ip, details in availableMixers.items():
             mixerLabel = QLabel(f"Mixer at {ip} - {details}")
             mixerButton = QPushButton("Select")
-            mixerButton.clicked.connect(lambda _, ip=ip: self.chooseMixer(ip))
+            mixerButton.clicked.connect(lambda _, ip=ip, name=details.split('|')[1].strip(): self.chooseMixer(ip, name))
             self.mixerGridLayout.addWidget(mixerLabel, row, 0)
             self.mixerGridLayout.addWidget(mixerButton, row, 1)
             row += 1
 
-    def updateSearchingAnimation(self):
-        self.animationIndex = (self.animationIndex + 1) % len(self.discoveryPhrases)
-        self.infoLabel.setText(self.discoveryPhrases[self.animationIndex])
-
-    def chooseMixer(self, ip):
+    def chooseMixer(self, ip, name):
         self.selectedMixerIp = ip
+        self.selectedMixerName = name
         self.accept()
 
+class CustomFader(QSlider):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setRange(-90, 10)
+        self.setValue(0)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        tickColor = QColor(0, 0, 0)  # Black color for ticks
+        painter.setPen(tickColor)
+
+        rect = self.rect()
+        interval = (rect.height() - 20) / (self.maximum() - self.minimum())
+
+        # Define the positions and values for the labels
+        tick_positions = [-90, -70, -50, -40, -30, -20, -10, -5, 0, 5, 10]
+        for tick in tick_positions:
+            y = rect.height() - ((tick - self.minimum()) * interval) - 10
+            painter.drawLine(30, int(y), rect.width(), int(y))  # Draw line across the fader
+            painter.drawText(5, int(y) + 5, str(tick))  # Draw the label to the left of the tick
+
+        painter.end()
+
+    def sizeHint(self):
+        return QSize(80, 200)  # Increase width to ensure labels fit
+
 class AudioPilotUI(QWidget):
-    def __init__(self, mixerIP, client):
+    def __init__(self, mixerName, client):
         super().__init__()
-        self.mixerAddress = mixerIP
+        self.mixerName = mixerName
         self.client = client
-        self.plotMgr = None  # initialize plot manager
-        self.channelNum = None  # initialize channel number
-        self.bandManagerThread = None  # to handle the band manager thread
-        self.bandThreadRunning = threading.Event()  # to track the state of the band manager thread
+        self.plotMgr = None
+        self.channelNum = None
+        self.bandManagerThread = None
+        self.bandThreadRunning = threading.Event()
+        self.isMuted = True  # Initial state is muted
         self.initUI()
 
     def initUI(self):
-        # Main layout
+        self.setWindowTitle('Audio Pilot')
+        self.setGeometry(100, 100, 1280, 768)  # Adjust the initial window size
+
         mainLayout = QVBoxLayout()
 
-        # Header
         headerLayout = QHBoxLayout()
-        self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerAddress}")
+        self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerName}")
         headerLayout.addWidget(self.mixerLabel)
         mainLayout.addLayout(headerLayout)
 
-        # Top layout
         topLayout = QHBoxLayout()
 
-        # Left panel: Fader and channel controls
         leftPanelLayout = QVBoxLayout()
 
         self.toggleMuteButton = QPushButton("Mute")
         self.toggleMuteButton.setCheckable(True)
+        self.toggleMuteButton.setStyleSheet("background-color: red")  # Initial state
         self.toggleMuteButton.clicked.connect(self.toggleMute)
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
-        self.fader = QSlider(Qt.Orientation.Vertical)
-        self.fader.setRange(-90, 10)  # dB range
-        self.fader.setValue(0)
+        self.fader = CustomFader(Qt.Orientation.Vertical)
         leftPanelLayout.addWidget(self.fader)
 
         self.selectChannelButton = QPushButton("Select Channel")
@@ -111,7 +136,6 @@ class AudioPilotUI(QWidget):
 
         topLayout.addLayout(leftPanelLayout)
 
-        # Middle panel: RTA plot
         self.graphWidget = pg.GraphicsLayoutWidget(show=True)
         self.plot = self.graphWidget.addPlot(title="RTA")
         self.plot.setLogMode(x=True, y=False)
@@ -121,26 +145,26 @@ class AudioPilotUI(QWidget):
         self.plot.showGrid(x=True, y=True)
         topLayout.addWidget(self.graphWidget)
 
-        # semi-transparent rectangle for dimming effect
         self.dimmingRectangle = QGraphicsRectItem(QRectF(self.plot.vb.viewRect()))
-        self.dimmingRectangle.setBrush(pg.mkBrush((0, 0, 0, 100)))  # semi-transparent black
-        self.dimmingRectangle.setZValue(10) # make sure it's on top of the plot
+        self.dimmingRectangle.setBrush(pg.mkBrush((0, 0, 0, 100)))
+        self.dimmingRectangle.setZValue(10)
         self.plot.addItem(self.dimmingRectangle)
         self.dimmingRectangle.hide()
 
-        # right panel: EQ and pitch controls
         eqControls = QVBoxLayout()
 
-        self.eqToggle = QPushButton("EQ On/Off")
-        self.eqToggle.setCheckable(True)
-        self.eqToggle.clicked.connect(self.toggleEQ)
-        eqControls.addWidget(self.eqToggle)
+        self.rtaToggle = QPushButton("RTA")
+        self.rtaToggle.setCheckable(True)
+        self.rtaToggle.setStyleSheet("background-color: gray")
+        self.rtaToggle.setChecked(False)
+        self.rtaToggle.clicked.connect(self.togglePlotUpdates)
+        eqControls.addWidget(self.rtaToggle)
 
         gainLayout = QVBoxLayout()
         gainLabel = QLabel("Gain Level")
         gainLayout.addWidget(gainLabel)
         self.gainDial = QDial()
-        self.gainDial.setRange(-15, 15)  # gain range in dB
+        self.gainDial.setRange(-15, 15)
         self.gainDial.setValue(0)
         gainLayout.addWidget(self.gainDial)
         eqControls.addLayout(gainLayout)
@@ -149,35 +173,35 @@ class AudioPilotUI(QWidget):
         lowcutLabel = QLabel("Lowcut Frequency")
         lowcutLayout.addWidget(lowcutLabel)
         self.lowcutDial = QDial()
-        self.lowcutDial.setRange(20, 400)  # frequency range in Hz
+        self.lowcutDial.setRange(20, 400)
         self.lowcutDial.setValue(100)
         lowcutLayout.addWidget(self.lowcutDial)
         eqControls.addLayout(lowcutLayout)
 
-        # Pitch Type Selector and Toggle
         pitchLayout = QVBoxLayout()
         self.pitchTypeSelector = QComboBox()
         self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
         pitchLayout.addWidget(self.pitchTypeSelector)
-        
+
         self.pitchToggle = QPushButton("AudioPilot")
         self.pitchToggle.setCheckable(True)
+        self.pitchToggle.setStyleSheet("background-color: gray")
+        self.pitchToggle.setChecked(False)
         self.pitchToggle.clicked.connect(self.togglePitchCorrection)
         pitchLayout.addWidget(self.pitchToggle)
-        
+
         eqControls.addLayout(pitchLayout)
 
         topLayout.addLayout(eqControls)
 
         mainLayout.addLayout(topLayout)
 
-        # bottom layout for EQ dials
         eqControlsLayout = QHBoxLayout()
-        
+
         freqLayout = QVBoxLayout()
         freqLabel = QLabel("Freq")
         self.freqDial = QDial()
-        self.freqDial.setRange(20, 20000)  # frequency range in Hz
+        self.freqDial.setRange(20, 20000)
         self.freqDial.setValue(1000)
         self.freqDial.setFixedSize(50, 50)
         freqLayout.addWidget(freqLabel)
@@ -187,7 +211,7 @@ class AudioPilotUI(QWidget):
         qLayout = QVBoxLayout()
         qLabel = QLabel("Q")
         self.qDial = QDial()
-        self.qDial.setRange(1, 10)  # Q range
+        self.qDial.setRange(1, 10)
         self.qDial.setValue(5)
         self.qDial.setFixedSize(50, 50)
         qLayout.addWidget(qLabel)
@@ -197,7 +221,7 @@ class AudioPilotUI(QWidget):
         smallGainLayout = QVBoxLayout()
         smallGainLabel = QLabel("Gain")
         self.smallGainDial = QDial()
-        self.smallGainDial.setRange(-12, 12)  # gain range in dB
+        self.smallGainDial.setRange(-12, 12)
         self.smallGainDial.setValue(0)
         self.smallGainDial.setFixedSize(50, 50)
         smallGainLayout.addWidget(smallGainLabel)
@@ -208,8 +232,24 @@ class AudioPilotUI(QWidget):
 
         self.setLayout(mainLayout)
 
-        self.setWindowTitle('Audio Mixer')
+        self.setWindowTitle('Audio Pilot')
         self.show()
+
+    def togglePlotUpdates(self):
+        if self.rtaToggle.isChecked():
+            self.rtaToggle.setStyleSheet("background-color: green")
+            if not self.plotMgr.plottingActive:
+                self.plotMgr.start()
+        else:
+            self.rtaToggle.setStyleSheet("background-color: gray")
+            if self.plotMgr.plottingActive:
+                self.plotMgr.shutdown()
+                self.clearPlot()
+
+    def clearPlot(self):
+        if self.plotMgr:
+            for bar in self.plotMgr.bars.values():
+                bar.clear()
 
     def redrawPlot(self):
         if self.plotMgr:
@@ -221,49 +261,53 @@ class AudioPilotUI(QWidget):
             self.selectChannelButton.setText(self.channelSelectorDialog.selectedChannel)
             self.channelNum = int(self.channelSelectorDialog.selectedChannel.split()[1]) - 1
             self.client.send_message('/-action/setrtasrc', [self.channelNum])
-            # Now start receiving and updating data for the selected channel
             self.startPlotting()
 
     def startPlotting(self):
-        if not self.plotMgr:
-            self.plotMgr = PlotManager(self.plot)
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.redrawPlot)
-        self.timer.start(100)
+        if self.channelNum is not None:
+            if not self.plotMgr:
+                print("Starting Plot Manager...")
+                self.plotMgr = PlotManager(self.plot)
+                self.plotMgr.setLogTicks()
+            if self.rtaToggle.isChecked():
+                self.plotMgr.start()
+
+    def stopPlotting(self):
+        if self.plotMgr:
+            print("Stopping Plot Manager...")
+            self.plotMgr.shutdown()
+            self.plotMgr = None
 
     def toggleMute(self):
-        if self.toggleMuteButton.isChecked():
-            self.toggleMuteButton.setStyleSheet("background-color: red")
-            print("Channel is muted.")
-        else:
-            self.toggleMuteButton.setStyleSheet("background-color: gray")
-            print("Channel is unmuted.")
-
-    def toggleEQ(self):
-        if self.eqToggle.isChecked():
-            self.dimmingRectangle.hide()
-            print("EQ is on.")
-        else:
-            self.dimmingRectangle.show()
-            print("EQ is off.")
+        if self.channelNum is not None:  # Ensure channelNum is set
+            if self.toggleMuteButton.isChecked():
+                self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 0)
+                self.toggleMuteButton.setStyleSheet("background-color: red")
+                print(f"Channel {self.channelNum} is muted.")
+            else:
+                self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 1)
+                self.toggleMuteButton.setStyleSheet("background-color: gray")
+                print(f"Channel {self.channelNum} is unmuted.")
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
+            self.pitchToggle.setStyleSheet("background-color: orange")
             vocalType = self.pitchTypeSelector.currentText()
             self.startBandManager(vocalType)
         else:
+            self.pitchToggle.setStyleSheet("background-color: gray")
             self.stopBandManager()
 
     def startBandManager(self, vocalType):
         if self.channelNum is not None:
-            self.bandThreadRunning.set()  # set the event to start the thread
+            self.bandThreadRunning.set()
             self.bandMgr = BandManager(self.client)
             self.bandManagerThread = threading.Thread(target=self.runBandManager, args=(vocalType, self.channelNum), daemon=True)
             self.bandManagerThread.start()
 
     def stopBandManager(self):
         if self.bandManagerThread is not None:
-            self.bandThreadRunning.clear()  # clear the event to stop the thread
+            self.bandThreadRunning.clear()
 
     def runBandManager(self, vocalType, channel):
         while self.bandThreadRunning.is_set():

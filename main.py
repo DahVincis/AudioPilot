@@ -14,6 +14,7 @@ if __name__ == "__main__":
     mixerDiscoveryDialog = MixerDiscoveryUI()
     if mixerDiscoveryDialog.exec() == QDialog.DialogCode.Accepted:
         chosenIP = mixerDiscoveryDialog.selectedMixerIp
+        chosenName = mixerDiscoveryDialog.selectedMixerName
         client = SimpleUDPClient(chosenIP, 10023)
 
         parser = argparse.ArgumentParser()
@@ -30,7 +31,7 @@ if __name__ == "__main__":
         print(f"Serving on {server.server_address}")
         client._sock = server.socket
 
-        appManager = ApplicationManager(client, server)
-        appManager.run(chosenIP)
+        appManager = ApplicationManager(client, server, chosenName)  # Pass the mixer name
+        appManager.run()
     else:
         sys.exit()

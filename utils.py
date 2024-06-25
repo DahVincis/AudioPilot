@@ -3,20 +3,22 @@ import time
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 from queue import Empty
 import sys
 from pythonosc.udp_client import SimpleUDPClient
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import select
 
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
 
 class ApplicationManager:
-    def __init__(self, client, server):
+    def __init__(self, client, server, mixerName):
         self.client = client
         self.server = server
+        self.mixerName = mixerName
 
-    def run(self, mixer_ip):
+    def run(self):
         from osc_handlers import RTASubscriber
         mixerManager = MixerManager(self.client)
         threadKeepAlive = threading.Thread(target=mixerManager.keepMixerAwake, daemon=True)
@@ -27,8 +29,8 @@ class ApplicationManager:
         threadRTASub.start()
 
         app = QApplication([])
-        from ui import AudioPilotUI  # aocal import to avoid circular dependency
-        mixerUI = AudioPilotUI(mixer_ip, self.client)
+        from ui import AudioPilotUI  # local import to avoid circular dependency
+        mixerUI = AudioPilotUI(self.mixerName, self.client)
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
@@ -45,36 +47,84 @@ class MixerManager:
     def keepMixerAwake(self):
         while True:
             self.client.send_message('/xremote', None)
-            self.client.send_message('/xinfo', None)
             time.sleep(3)
 
-class PlotManager:
+class PlotManager(QObject):
+    plotDataUpdated = pyqtSignal(list)
+
     def __init__(self, plot):
+        super().__init__()
         self.plot = plot
         self.bars = {}
+        self.executor = None
+        self.lock = threading.Lock()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.updatePlot)
+        self.plottingActive = False
+        self.plotDataUpdated.connect(self._updatePlotUI)
+
+    def start(self):
+        if not self.plottingActive:
+            print("Starting the plotting timer...")
+            self.executor = ThreadPoolExecutor(max_workers=20)
+            self.plottingActive = True
+            self.timer.start(200)
 
     def updatePlot(self):
+        if self.executor:
+            future = self.executor.submit(self._processPlotData)
+            future.add_done_callback(self._updatePlotCallback)
+
+    def _processPlotData(self):
         try:
             latestData = queueRTA.get_nowait()
             threshUpper = -10
             threshMid = -18
             threshLower = -45
+            plot_data = []
             for freq in frequencies:
                 dbValues = latestData.get(freq, [-90])
                 dbLatest = dbValues[-1] if dbValues else -90
                 color = 'r' if dbLatest >= threshUpper else 'y' if threshMid <= dbLatest < threshUpper else 'g' if dbLatest >= threshLower <= threshMid else 'b'
+                plot_data.append((freq, dbLatest, color))
+            return plot_data
+        except Empty:
+            return []
+
+    def _updatePlotCallback(self, future):
+        try:
+            plotData = future.result()
+            self.plotDataUpdated.emit(plotData)
+        except Exception as e:
+            print(f"Error updating plot: {e}")
+
+    def _updatePlotUI(self, plot_data):
+        with self.lock:
+            for freq, dbLatest, color in plot_data:
                 if freq in self.bars:
                     self.bars[freq].setData([freq, freq], [dbLatest, -90])
                     self.bars[freq].setPen(pg.mkPen(color, width=3))
                 else:
                     self.bars[freq] = self.plot.plot([freq, freq], [dbLatest, -90], pen=pg.mkPen(color, width=3))
-        except Empty:
-            pass
 
     def setLogTicks(self):
-        ticks = np.logspace(np.log10(frequencies[0]), np.log10(frequencies[-1]), num=20)
-        labelTicks = [(tick, f"{int(tick)} Hz") for tick in ticks]
-        self.plot.getAxis('bottom').setTicks([labelTicks])
+        customTicks = [
+            (20, "20"), (40, "40"), (60, "60"), (80, "80"), (100, "100"),
+            (200, "200"), (300, "300"), (400, "400"), (600, "600"), (800, "800"),
+            (1000, "1k"), (2000, "2k"), (3000, "3k"), (4000, "4k"), (5000, "5k"),
+            (6000, "6k"), (7000, "7k"), (8000, "8k"), (9000, "9k"), (10000, "10k"),
+            (20000, "20k")
+        ]
+        self.plot.getAxis('bottom').setTicks([customTicks])
+
+    def shutdown(self):
+        if self.plottingActive:
+            print("Stopping the plotting timer and shutting down the executor...")
+            self.plottingActive = False
+            self.timer.stop()
+            if self.executor:
+                self.executor.shutdown(wait=True)
+                self.executor = None
 
 class BandManager:
     def __init__(self, client):
@@ -222,18 +272,10 @@ class BandManager:
             qIDValue = self.getClosestQIDValue(qValue)
             self.sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)
 
-    def threadUpdateBand(self, vocalType, channel):
-        print(f"Starting continuous updates for vocal type {vocalType} on channel {channel}...")
-        while True:
-            if not self.band_manager_thread_running:
-                break
-            self.updateAllBands(vocalType, channel)
-            time.sleep(0.3)
-
 class MixerDiscovery:
     def __init__(self, port=10023):
         self.port = port
-        self.subnets = ["192.168.10", "192.168.1"]
+        self.subnets = ["192.168.10", "192.168.1", "192.168.56"]
 
     def checkMixerIP(self, ip):
         try:
