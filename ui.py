@@ -144,7 +144,7 @@ class AudioPilotUI(QWidget):
 
         self.toggleMuteButton = QPushButton("Mute")
         self.toggleMuteButton.setCheckable(True)
-        self.toggleMuteButton.setStyleSheet("background-color: red")  # Initial state
+        self.toggleMuteButton.setStyleSheet("background-color: gray")  # Initial state
         self.toggleMuteButton.clicked.connect(self.toggleMute)
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
