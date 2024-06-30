@@ -12,8 +12,8 @@ class RTASubscriber:
     def subRenewRTA(self):
         import time
         while True:
-            self.client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 99])
-            time.sleep(0.1)
+            self.client.send_message("/batchsubscribe", ["/meters", "/meters/15", 0, 0, 2])
+            time.sleep(5)
 
     def handlerRTA(self, address, *args):
         global receivedFirstRTA

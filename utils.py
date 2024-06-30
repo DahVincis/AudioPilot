@@ -7,7 +7,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 from queue import Empty
 import sys
 from pythonosc.udp_client import SimpleUDPClient
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import select
 
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
