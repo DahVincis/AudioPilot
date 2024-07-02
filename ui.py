@@ -75,6 +75,7 @@ class CustomFader(QSlider):
         self.client = client
         self.channel_num = channel_num
         self.scale_factor = 100  # Scale factor to convert float to int
+        self.skip_value = 9  # Default skip value for scrolling
         # Replace special minus character with standard minus sign
         corrected_keys = [key.replace('‐', '-') for key in faderData.keys()]
         min_value = min(map(lambda x: int(float(x) * self.scale_factor), corrected_keys))
@@ -107,6 +108,9 @@ class CustomFader(QSlider):
     def sizeHint(self):
         return QSize(80, 200)  # Increase width to ensure labels fit
 
+    def setFineMode(self, is_fine):
+        self.skip_value = 3 if is_fine else 5
+
     def sendOscMessage(self):
         db_value = self.value() / self.scale_factor
         corrected_keys = {key.replace('‐', '-'): value for key, value in faderData.items()}
@@ -114,6 +118,12 @@ class CustomFader(QSlider):
         if float_id is not None and self.channel_num is not None:
             self.client.send_message(f'/ch/{self.channel_num + 1}/mix/fader', [float_id])
             self.valueChangedSignal.emit(float_id)
+
+    def wheelEvent(self, event):
+        steps = event.angleDelta().y() / 120
+        new_value = self.value() + int(steps * self.skip_value * self.scale_factor)
+        new_value = max(self.minimum(), min(self.maximum(), new_value))
+        self.setValue(new_value)
 
 class AudioPilotUI(QWidget):
     def __init__(self, mixerName, client):
@@ -124,7 +134,7 @@ class AudioPilotUI(QWidget):
         self.channelNum = None
         self.bandManagerThread = None
         self.bandThreadRunning = threading.Event()
-        self.isMuted = False  # Initial state is muted
+        self.isMuted = True  # Initial state is muted
         self.initUI()
 
     def initUI(self):
@@ -166,12 +176,6 @@ class AudioPilotUI(QWidget):
         self.plot.showGrid(x=True, y=True)
         topLayout.addWidget(self.graphWidget)
 
-        self.dimmingRectangle = QGraphicsRectItem(QRectF(self.plot.vb.viewRect()))
-        self.dimmingRectangle.setBrush(pg.mkBrush((0, 0, 0, 100)))
-        self.dimmingRectangle.setZValue(10)
-        self.plot.addItem(self.dimmingRectangle)
-        self.dimmingRectangle.hide()
-
         eqControls = QVBoxLayout()
 
         self.rtaToggle = QPushButton("RTA")
@@ -180,6 +184,13 @@ class AudioPilotUI(QWidget):
         self.rtaToggle.setChecked(False)
         self.rtaToggle.clicked.connect(self.togglePlotUpdates)
         eqControls.addWidget(self.rtaToggle)
+
+        self.fineButton = QPushButton("Fine")
+        self.fineButton.setCheckable(True)
+        self.fineButton.setStyleSheet("background-color: gray")
+        self.fineButton.setChecked(False)
+        self.fineButton.clicked.connect(self.toggleFineMode)
+        eqControls.addWidget(self.fineButton)
 
         gainLayout = QVBoxLayout()
         gainLabel = QLabel("Gain Level")
@@ -255,6 +266,11 @@ class AudioPilotUI(QWidget):
 
         self.setWindowTitle('Audio Pilot')
         self.show()
+
+    def toggleFineMode(self):
+        is_fine = self.fineButton.isChecked()
+        self.fineButton.setStyleSheet("background-color: green" if is_fine else "background-color: gray")
+        self.fader.setFineMode(is_fine)
 
     def togglePlotUpdates(self):
         if self.rtaToggle.isChecked():
