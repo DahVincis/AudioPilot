@@ -10,6 +10,7 @@ import threading
 import time
 
 from utils import MixerDiscovery, PlotManager, BandManager
+from Data import faderData
 
 class MixerDiscoveryWorker(QThread):
     mixersFound = pyqtSignal(dict)
@@ -67,10 +68,22 @@ class MixerDiscoveryUI(QDialog):
         self.accept()
 
 class CustomFader(QSlider):
-    def __init__(self, *args, **kwargs):
+    valueChangedSignal = pyqtSignal(float)
+
+    def __init__(self, client, channel_num, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setRange(-90, 10)
+        self.client = client
+        self.channel_num = channel_num
+        self.scale_factor = 100  # Scale factor to convert float to int
+        self.skip_value = 9  # Default skip value for scrolling
+        # Replace special minus character with standard minus sign
+        corrected_keys = [key.replace('‐', '-') for key in faderData.keys()]
+        min_value = min(map(lambda x: int(float(x) * self.scale_factor), corrected_keys))
+        max_value = max(map(lambda x: int(float(x) * self.scale_factor), corrected_keys))
+        self.setRange(min_value, max_value)
         self.setValue(0)
+        self.valueChanged.connect(self.sendOscMessage)
+        self.tick_interval = (self.maximum() - self.minimum()) / 10
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -82,17 +95,35 @@ class CustomFader(QSlider):
         rect = self.rect()
         interval = (rect.height() - 20) / (self.maximum() - self.minimum())
 
-        # Define the positions and values for the labels
-        tick_positions = [-90, -70, -50, -40, -30, -20, -10, -5, 0, 5, 10]
-        for tick in tick_positions:
+        # Define the positions and values for the labels we want to show
+        tick_positions = [10, 5, 0, -10, -20, -30, -40, -50, -70, -90]
+        scaled_ticks = [int(tick * self.scale_factor) for tick in tick_positions]
+        for tick in scaled_ticks:
             y = rect.height() - ((tick - self.minimum()) * interval) - 10
             painter.drawLine(30, int(y), rect.width(), int(y))  # Draw line across the fader
-            painter.drawText(5, int(y) + 5, str(tick))  # Draw the label to the left of the tick
+            painter.drawText(5, int(y) + 5, str(tick / self.scale_factor))  # Draw the label to the left of the tick
 
         painter.end()
 
     def sizeHint(self):
         return QSize(80, 200)  # Increase width to ensure labels fit
+
+    def setFineMode(self, is_fine):
+        self.skip_value = 3 if is_fine else 5
+
+    def sendOscMessage(self):
+        db_value = self.value() / self.scale_factor
+        corrected_keys = {key.replace('‐', '-'): value for key, value in faderData.items()}
+        float_id = corrected_keys.get(str(db_value), None)
+        if float_id is not None and self.channel_num is not None:
+            self.client.send_message(f'/ch/{self.channel_num + 1}/mix/fader', [float_id])
+            self.valueChangedSignal.emit(float_id)
+
+    def wheelEvent(self, event):
+        steps = event.angleDelta().y() / 120
+        new_value = self.value() + int(steps * self.skip_value * self.scale_factor)
+        new_value = max(self.minimum(), min(self.maximum(), new_value))
+        self.setValue(new_value)
 
 class AudioPilotUI(QWidget):
     def __init__(self, mixerName, client):
@@ -123,11 +154,11 @@ class AudioPilotUI(QWidget):
 
         self.toggleMuteButton = QPushButton("Mute")
         self.toggleMuteButton.setCheckable(True)
-        self.toggleMuteButton.setStyleSheet("background-color: red")  # Initial state
+        self.toggleMuteButton.setStyleSheet("background-color: gray")  # Initial state
         self.toggleMuteButton.clicked.connect(self.toggleMute)
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
-        self.fader = CustomFader(Qt.Orientation.Vertical)
+        self.fader = CustomFader(self.client, self.channelNum, Qt.Orientation.Vertical)
         leftPanelLayout.addWidget(self.fader)
 
         self.selectChannelButton = QPushButton("Select Channel")
@@ -145,12 +176,6 @@ class AudioPilotUI(QWidget):
         self.plot.showGrid(x=True, y=True)
         topLayout.addWidget(self.graphWidget)
 
-        self.dimmingRectangle = QGraphicsRectItem(QRectF(self.plot.vb.viewRect()))
-        self.dimmingRectangle.setBrush(pg.mkBrush((0, 0, 0, 100)))
-        self.dimmingRectangle.setZValue(10)
-        self.plot.addItem(self.dimmingRectangle)
-        self.dimmingRectangle.hide()
-
         eqControls = QVBoxLayout()
 
         self.rtaToggle = QPushButton("RTA")
@@ -159,6 +184,13 @@ class AudioPilotUI(QWidget):
         self.rtaToggle.setChecked(False)
         self.rtaToggle.clicked.connect(self.togglePlotUpdates)
         eqControls.addWidget(self.rtaToggle)
+
+        self.fineButton = QPushButton("Fine")
+        self.fineButton.setCheckable(True)
+        self.fineButton.setStyleSheet("background-color: gray")
+        self.fineButton.setChecked(False)
+        self.fineButton.clicked.connect(self.toggleFineMode)
+        eqControls.addWidget(self.fineButton)
 
         gainLayout = QVBoxLayout()
         gainLabel = QLabel("Gain Level")
@@ -235,6 +267,11 @@ class AudioPilotUI(QWidget):
         self.setWindowTitle('Audio Pilot')
         self.show()
 
+    def toggleFineMode(self):
+        is_fine = self.fineButton.isChecked()
+        self.fineButton.setStyleSheet("background-color: green" if is_fine else "background-color: gray")
+        self.fader.setFineMode(is_fine)
+
     def togglePlotUpdates(self):
         if self.rtaToggle.isChecked():
             self.rtaToggle.setStyleSheet("background-color: green")
@@ -261,6 +298,7 @@ class AudioPilotUI(QWidget):
             self.selectChannelButton.setText(self.channelSelectorDialog.selectedChannel)
             self.channelNum = int(self.channelSelectorDialog.selectedChannel.split()[1]) - 1
             self.client.send_message('/-action/setrtasrc', [self.channelNum])
+            self.fader.channel_num = self.channelNum  # Set channel number for fader
             self.startPlotting()
 
     def startPlotting(self):
@@ -283,11 +321,11 @@ class AudioPilotUI(QWidget):
             if self.toggleMuteButton.isChecked():
                 self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 0)
                 self.toggleMuteButton.setStyleSheet("background-color: red")
-                print(f"Channel {self.channelNum} is muted.")
+                print(f"Channel {self.channelNum +1} is muted.")
             else:
                 self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 1)
                 self.toggleMuteButton.setStyleSheet("background-color: gray")
-                print(f"Channel {self.channelNum} is unmuted.")
+                print(f"Channel {self.channelNum +1} is unmuted.")
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
