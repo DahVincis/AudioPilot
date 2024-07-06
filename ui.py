@@ -10,7 +10,7 @@ import threading
 import time
 
 from utils import MixerDiscovery, PlotManager, BandManager
-from Data import faderData
+from Data import faderData, eqGainValues, lowcutFreq, eqFreq, qValues, trimValues
 
 class MixerDiscoveryWorker(QThread):
     mixersFound = pyqtSignal(dict)
@@ -116,7 +116,8 @@ class CustomFader(QSlider):
         corrected_keys = {key.replace('‐', '-'): value for key, value in faderData.items()}
         float_id = corrected_keys.get(str(db_value), None)
         if float_id is not None and self.channel_num is not None:
-            self.client.send_message(f'/ch/{self.channel_num + 1}/mix/fader', [float_id])
+            channel_num_formatted = f"{self.channel_num +1:02}"  # Format channel_num as two-digit
+            self.client.send_message(f'/ch/{channel_num_formatted}/mix/fader', [float_id])
             self.valueChangedSignal.emit(float_id)
 
     def wheelEvent(self, event):
@@ -135,6 +136,7 @@ class AudioPilotUI(QWidget):
         self.bandManagerThread = None
         self.bandThreadRunning = threading.Event()
         self.isMuted = True  # Initial state is muted
+        self.selectedBand = 1  # Default to the first band
         self.initUI()
 
     def initUI(self):
@@ -192,14 +194,16 @@ class AudioPilotUI(QWidget):
         self.fineButton.clicked.connect(self.toggleFineMode)
         eqControls.addWidget(self.fineButton)
 
-        gainLayout = QVBoxLayout()
-        gainLabel = QLabel("Gain Level")
-        gainLayout.addWidget(gainLabel)
-        self.gainDial = QDial()
-        self.gainDial.setRange(-15, 15)
-        self.gainDial.setValue(0)
-        gainLayout.addWidget(self.gainDial)
-        eqControls.addLayout(gainLayout)
+        # Add trimDial (Trim dial on the right of the plot)
+        trimLayout = QVBoxLayout()
+        trimLabel = QLabel("Trim")
+        trimLayout.addWidget(trimLabel)
+        self.trimDial = QDial()
+        self.trimDial.setRange(-18, 18)
+        self.trimDial.setValue(0)
+        self.trimDial.valueChanged.connect(self.changeTrim)
+        trimLayout.addWidget(self.trimDial)
+        eqControls.addLayout(trimLayout)
 
         lowcutLayout = QVBoxLayout()
         lowcutLabel = QLabel("Lowcut Frequency")
@@ -207,9 +211,35 @@ class AudioPilotUI(QWidget):
         self.lowcutDial = QDial()
         self.lowcutDial.setRange(20, 400)
         self.lowcutDial.setValue(100)
+        self.lowcutDial.valueChanged.connect(self.changeLowCut)
         lowcutLayout.addWidget(self.lowcutDial)
         eqControls.addLayout(lowcutLayout)
 
+        self.lowCutToggleButton = QPushButton("Low Cut On/Off")
+        self.lowCutToggleButton.setCheckable(True)
+        self.lowCutToggleButton.setStyleSheet("background-color: gray")
+        self.lowCutToggleButton.setChecked(False)
+        self.lowCutToggleButton.clicked.connect(self.toggleLowCut)
+        eqControls.addWidget(self.lowCutToggleButton)
+
+        # Add EQ Type Dropdown
+        eqTypeLayout = QVBoxLayout()
+        eqTypeLabel = QLabel("EQ Type")
+        eqTypeLayout.addWidget(eqTypeLabel)
+        self.eqTypeDropdown = QComboBox()
+        self.eqTypeDropdown.addItems(["LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"])
+        eqTypeLayout.addWidget(self.eqTypeDropdown)
+        eqControls.addLayout(eqTypeLayout)
+
+        # Add EQ Toggle Button
+        self.eqToggleButton = QPushButton("EQ On/Off")
+        self.eqToggleButton.setCheckable(True)
+        self.eqToggleButton.setStyleSheet("background-color: gray")
+        self.eqToggleButton.setChecked(False)
+        self.eqToggleButton.clicked.connect(self.toggleEQ)
+        eqControls.addWidget(self.eqToggleButton)
+
+        # Add pitch controls
         pitchLayout = QVBoxLayout()
         self.pitchTypeSelector = QComboBox()
         self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
@@ -221,7 +251,6 @@ class AudioPilotUI(QWidget):
         self.pitchToggle.setChecked(False)
         self.pitchToggle.clicked.connect(self.togglePitchCorrection)
         pitchLayout.addWidget(self.pitchToggle)
-
         eqControls.addLayout(pitchLayout)
 
         topLayout.addLayout(eqControls)
@@ -229,6 +258,18 @@ class AudioPilotUI(QWidget):
         mainLayout.addLayout(topLayout)
 
         eqControlsLayout = QHBoxLayout()
+        
+        # Add Band Selection Buttons
+        bandSelectionLayout = QHBoxLayout()
+        self.bandButtons = QButtonGroup(self)
+        bands = ["Low", "LoMid", "HiMid", "High"]
+        for index, band in enumerate(bands):
+            btn = QPushButton(band)
+            btn.setCheckable(True)
+            self.bandButtons.addButton(btn, index + 1)
+            bandSelectionLayout.addWidget(btn)
+        self.bandButtons.buttonClicked.connect(self.changeBand)
+        eqControlsLayout.addLayout(bandSelectionLayout)
 
         freqLayout = QVBoxLayout()
         freqLabel = QLabel("Freq")
@@ -236,6 +277,7 @@ class AudioPilotUI(QWidget):
         self.freqDial.setRange(20, 20000)
         self.freqDial.setValue(1000)
         self.freqDial.setFixedSize(50, 50)
+        self.freqDial.valueChanged.connect(self.changeFreq)
         freqLayout.addWidget(freqLabel)
         freqLayout.addWidget(self.freqDial)
         eqControlsLayout.addLayout(freqLayout)
@@ -246,6 +288,7 @@ class AudioPilotUI(QWidget):
         self.qDial.setRange(1, 10)
         self.qDial.setValue(5)
         self.qDial.setFixedSize(50, 50)
+        self.qDial.valueChanged.connect(self.changeQ)
         qLayout.addWidget(qLabel)
         qLayout.addWidget(self.qDial)
         eqControlsLayout.addLayout(qLayout)
@@ -256,6 +299,7 @@ class AudioPilotUI(QWidget):
         self.smallGainDial.setRange(-12, 12)
         self.smallGainDial.setValue(0)
         self.smallGainDial.setFixedSize(50, 50)
+        self.smallGainDial.valueChanged.connect(self.changeEqGain)
         smallGainLayout.addWidget(smallGainLabel)
         smallGainLayout.addWidget(self.smallGainDial)
         eqControlsLayout.addLayout(smallGainLayout)
@@ -266,6 +310,7 @@ class AudioPilotUI(QWidget):
 
         self.setWindowTitle('Audio Pilot')
         self.show()
+
 
     def toggleFineMode(self):
         is_fine = self.fineButton.isChecked()
@@ -318,14 +363,15 @@ class AudioPilotUI(QWidget):
 
     def toggleMute(self):
         if self.channelNum is not None:  # Ensure channelNum is set
+            channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
             if self.toggleMuteButton.isChecked():
-                self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 0)
+                self.client.send_message(f'/ch/{channel_num_formatted}/mix/on', 0)
                 self.toggleMuteButton.setStyleSheet("background-color: red")
-                print(f"Channel {self.channelNum +1} is muted.")
+                print(f"Channel {channel_num_formatted} is muted.")
             else:
-                self.client.send_message(f'/ch/{self.channelNum +1}/mix/on', 1)
+                self.client.send_message(f'/ch/{channel_num_formatted}/mix/on', 1)
                 self.toggleMuteButton.setStyleSheet("background-color: gray")
-                print(f"Channel {self.channelNum +1} is unmuted.")
+                print(f"Channel {channel_num_formatted} is unmuted.")
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
@@ -352,6 +398,78 @@ class AudioPilotUI(QWidget):
             self.bandMgr.updateAllBands(vocalType, channel)
             time.sleep(0.3)
 
+    def changeBand(self, button):
+        self.selectedBand = self.bandButtons.id(button)
+
+    def changeEqGain(self, value):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        closest_value = min(eqGainValues.keys(), key=lambda k: abs(k - value))
+        gain_id = eqGainValues[closest_value]
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/g', [gain_id])
+
+    def changeLowCut(self, value):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        closest_value = min(lowcutFreq.keys(), key=lambda k: abs(k - value))
+        lowcut_freq_id = lowcutFreq[closest_value]
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpf', [lowcut_freq_id])
+
+    def changeFreq(self, value):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        def convert_freq_to_float(freq):
+            return float(freq)
+
+        freq_keys = [convert_freq_to_float(k) for k in eqFreq.keys()]
+        closest_value = min(freq_keys, key=lambda k: abs(k - value))
+        # Find the closest key in its original string format
+        closest_key = min(eqFreq.keys(), key=lambda k: abs(float(k) - closest_value))
+        freq_id = eqFreq[closest_key]
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/f', [freq_id])
+
+    def changeQ(self, value):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        closest_value = min(qValues.keys(), key=lambda k: abs(k - value))
+        q_value_id = qValues[closest_value]
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/q', [q_value_id])
+
+    def changeTrim(self, value):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        closest_value = min(trimValues.keys(), key=lambda k: abs(k - value))
+        trim_id = trimValues[closest_value]
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/trim', [trim_id])
+
+    def toggleEQ(self):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        state = 1 if self.eqToggleButton.isChecked() else 0
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/eq/on/', [state])
+        self.eqToggleButton.setStyleSheet("background-color: green" if state else "background-color: gray")
+
+    def toggleLowCut(self):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        state = 1 if self.lowCutToggleButton.isChecked() else 0
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon/', [state])
+        self.lowCutToggleButton.setStyleSheet("background-color: green" if state else "background-color: gray")
+
 class ChannelSelectorDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -376,23 +494,3 @@ class ChannelSelectorDialog(QDialog):
         if selectedButton:
             self.selectedChannel = selectedButton.text()
             self.accept()
-
-class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Settings")
-        self.initUI()
-
-    def initUI(self):
-        layout = QFormLayout()
-
-        self.pitchTypeSelector = QComboBox()
-        self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
-        layout.addRow("Pitch Type:", self.pitchTypeSelector)
-
-        self.lowcutDial = QDial()
-        self.lowcutDial.setRange(20, 400)  # frequency range in Hz
-        self.lowcutDial.setValue(100)
-        layout.addRow("Lowcut Frequency:", self.lowcutDial)
-
-        self.setLayout(layout)
