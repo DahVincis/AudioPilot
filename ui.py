@@ -11,6 +11,9 @@ import time
 
 from utils import MixerDiscovery, PlotManager, BandManager
 from Data import faderData, eqGainValues, lowcutFreq, eqFreq, qValues, trimValues
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 class MixerDiscoveryWorker(QThread):
     mixersFound = pyqtSignal(dict)
@@ -75,12 +78,11 @@ class CustomFader(QSlider):
         self.client = client
         self.channel_num = channel_num
         self.scale_factor = 100  # Scale factor to convert float to int
-        self.skip_value = 9  # Default skip value for scrolling
-        # Replace special minus character with standard minus sign
-        corrected_keys = [key.replace('‐', '-') for key in faderData.keys()]
-        min_value = min(map(lambda x: int(float(x) * self.scale_factor), corrected_keys))
-        max_value = max(map(lambda x: int(float(x) * self.scale_factor), corrected_keys))
-        self.setRange(min_value, max_value)
+        self.precision_factor = 1  # Default precision factor
+        self.corrected_keys = [key.replace('‐', '-') for key in faderData.keys()]
+        self.min_value = min(map(lambda x: int(float(x) * self.scale_factor), self.corrected_keys))
+        self.max_value = max(map(lambda x: int(float(x) * self.scale_factor), self.corrected_keys))
+        self.setRange(self.min_value, self.max_value)
         self.setValue(0)
         self.valueChanged.connect(self.sendOscMessage)
         self.tick_interval = (self.maximum() - self.minimum()) / 10
@@ -109,22 +111,34 @@ class CustomFader(QSlider):
         return QSize(80, 200)  # Increase width to ensure labels fit
 
     def setFineMode(self, is_fine):
-        self.skip_value = 3 if is_fine else 5
+        self.precision_factor = 0.7 if is_fine else 1
 
     def sendOscMessage(self):
         db_value = self.value() / self.scale_factor
         corrected_keys = {key.replace('‐', '-'): value for key, value in faderData.items()}
         float_id = corrected_keys.get(str(db_value), None)
         if float_id is not None and self.channel_num is not None:
-            channel_num_formatted = f"{self.channel_num +1:02}"  # Format channel_num as two-digit
+            channel_num_formatted = f"{self.channel_num+1:02}"  # Format channel_num as two-digit
             self.client.send_message(f'/ch/{channel_num_formatted}/mix/fader', [float_id])
             self.valueChangedSignal.emit(float_id)
+            logging.debug(f'Sent OSC message: /ch/{channel_num_formatted}/mix/fader {float_id}')
 
     def wheelEvent(self, event):
         steps = event.angleDelta().y() / 120
-        new_value = self.value() + int(steps * self.skip_value * self.scale_factor)
+        new_value = self.value() + int(steps * self.precision_factor * self.scale_factor)
         new_value = max(self.minimum(), min(self.maximum(), new_value))
-        self.setValue(new_value)
+        if new_value != self.value():
+            self.setValue(new_value)
+            self.sendOscMessage()  # Send OSC message when scrolling
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            new_value = self.minimum() + ((self.maximum() - self.minimum()) * (self.height() - event.position().y()) / self.height())
+            new_value = int(new_value / self.precision_factor) * self.precision_factor
+            if new_value != self.value():
+                self.setValue(int(new_value))
+                self.sendOscMessage()  # Send OSC message when dragging
+
 
 class AudioPilotUI(QWidget):
     def __init__(self, mixerName, client):
@@ -199,7 +213,7 @@ class AudioPilotUI(QWidget):
         trimLabel = QLabel("Trim")
         trimLayout.addWidget(trimLabel)
         self.trimDial = QDial()
-        self.trimDial.setRange(-18, 18)
+        self.trimDial.setRange(int(min(trimValues.keys())), int(max(trimValues.keys())))
         self.trimDial.setValue(0)
         self.trimDial.valueChanged.connect(self.changeTrim)
         trimLayout.addWidget(self.trimDial)
@@ -209,7 +223,7 @@ class AudioPilotUI(QWidget):
         lowcutLabel = QLabel("Lowcut Frequency")
         lowcutLayout.addWidget(lowcutLabel)
         self.lowcutDial = QDial()
-        self.lowcutDial.setRange(20, 400)
+        self.lowcutDial.setRange(int(min(lowcutFreq.keys())), int(max(lowcutFreq.keys())))
         self.lowcutDial.setValue(100)
         self.lowcutDial.valueChanged.connect(self.changeLowCut)
         lowcutLayout.addWidget(self.lowcutDial)
@@ -274,7 +288,7 @@ class AudioPilotUI(QWidget):
         freqLayout = QVBoxLayout()
         freqLabel = QLabel("Freq")
         self.freqDial = QDial()
-        self.freqDial.setRange(20, 20000)
+        self.freqDial.setRange(int(min(map(float, eqFreq.keys()))), int(max(map(float, eqFreq.keys()))))
         self.freqDial.setValue(1000)
         self.freqDial.setFixedSize(50, 50)
         self.freqDial.valueChanged.connect(self.changeFreq)
@@ -285,7 +299,7 @@ class AudioPilotUI(QWidget):
         qLayout = QVBoxLayout()
         qLabel = QLabel("Q")
         self.qDial = QDial()
-        self.qDial.setRange(1, 10)
+        self.qDial.setRange(int(min(qValues.keys())), int(max(qValues.keys())))
         self.qDial.setValue(5)
         self.qDial.setFixedSize(50, 50)
         self.qDial.valueChanged.connect(self.changeQ)
@@ -296,7 +310,7 @@ class AudioPilotUI(QWidget):
         smallGainLayout = QVBoxLayout()
         smallGainLabel = QLabel("Gain")
         self.smallGainDial = QDial()
-        self.smallGainDial.setRange(-12, 12)
+        self.smallGainDial.setRange(int(min(eqGainValues.keys())), int(max(eqGainValues.keys())))
         self.smallGainDial.setValue(0)
         self.smallGainDial.setFixedSize(50, 50)
         self.smallGainDial.valueChanged.connect(self.changeEqGain)
@@ -311,20 +325,19 @@ class AudioPilotUI(QWidget):
         self.setWindowTitle('Audio Pilot')
         self.show()
 
-
     def toggleFineMode(self):
         is_fine = self.fineButton.isChecked()
         self.fineButton.setStyleSheet("background-color: green" if is_fine else "background-color: gray")
         self.fader.setFineMode(is_fine)
 
     def togglePlotUpdates(self):
-        if self.rtaToggle.isChecked():
+        if (self.rtaToggle.isChecked() and self.plotMgr is not None):
             self.rtaToggle.setStyleSheet("background-color: green")
             if not self.plotMgr.plottingActive:
                 self.plotMgr.start()
         else:
             self.rtaToggle.setStyleSheet("background-color: gray")
-            if self.plotMgr.plottingActive:
+            if self.plotMgr is not None and self.plotMgr.plottingActive:
                 self.plotMgr.shutdown()
                 self.clearPlot()
 
@@ -467,7 +480,7 @@ class AudioPilotUI(QWidget):
             return
         state = 1 if self.lowCutToggleButton.isChecked() else 0
         channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon/', [state])
+        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon', [state])
         self.lowCutToggleButton.setStyleSheet("background-color: green" if state else "background-color: gray")
 
 class ChannelSelectorDialog(QDialog):
