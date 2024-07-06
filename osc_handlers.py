@@ -53,7 +53,7 @@ class RTASubscriber:
         except Exception as e:
             print(f"Error processing RTA data: {e}")
 
-class FaderHandler:
+class OscHandlers:
     def handlerFader(self, address, *args):
         if args and isinstance(args[0], float):
             f = args[0]

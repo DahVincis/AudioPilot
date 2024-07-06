@@ -289,7 +289,7 @@ class MixerDiscovery:
             pass
 
     def discoverMixers(self):
-        from osc_handlers import FaderHandler
+        from osc_handlers import OscHandlers
         discIPs = {}
         with ThreadPoolExecutor(max_workers=100) as executor:
             futures = {executor.submit(self.checkMixerIP, f"{subnet}.{i}"): f"{subnet}.{i}" for subnet in self.subnets for i in range(256)}
@@ -297,6 +297,6 @@ class MixerDiscovery:
                 result = future.result()
                 if result:
                     ip, rawData = result
-                    details = FaderHandler().handlerXInfo(rawData)
+                    details = OscHandlers().handlerXInfo(rawData)
                     discIPs[ip] = details
         return discIPs
