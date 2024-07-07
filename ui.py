@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
-    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QButtonGroup, QGraphicsBlurEffect
+    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QButtonGroup, 
+    QGraphicsBlurEffect, QGraphicsDropShadowEffect
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QThread, QSize
 from PyQt6.QtGui import QPainter, QColor, QIcon
@@ -15,19 +16,15 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-# Styling constants
-BACKGROUND_COLOR = "#191714"
-HEADER_COLOR = "#D98324"
-TEXT_COLOR = "#D3D3D3"
-FONT_FAMILY = "Verdana, Helvetica, sans-serif"
-BUTTON_COLOR = "#001e7b"
-BUTTON_SELECTED_COLOR = "#cb4c00"
-FONT_SIZE = 14
-FONT_WEIGHT = 565
-
-font_style = f"font-family: {FONT_FAMILY}; font-size: {FONT_SIZE}px; font-weight: {FONT_WEIGHT};"
-
 LOGO_PATH = "AudioPilot_Logo2.png"
+
+def apply_shadow(widget, blur_radius=15, x_offset=3, y_offset=3, color=QColor(0, 0, 0, 160)):
+    shadow = QGraphicsDropShadowEffect()
+    shadow.setBlurRadius(blur_radius)
+    shadow.setXOffset(x_offset)
+    shadow.setYOffset(y_offset)
+    shadow.setColor(color)
+    widget.setGraphicsEffect(shadow)
 
 class MixerDiscoveryWorker(QThread):
     mixersFound = pyqtSignal(dict)
@@ -52,7 +49,7 @@ class MixerDiscoveryUI(QDialog):
         self.mixerWorker.start()
 
     def initUI(self):
-        self.setStyleSheet(f"background-color: {BACKGROUND_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        self.loadStylesheet("styles.qss")
         self.layout = QVBoxLayout()
         self.infoLabel = QLabel("Searching for mixers...")
         self.infoLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -62,11 +59,15 @@ class MixerDiscoveryUI(QDialog):
 
         # Search Again button
         self.searchAgainButton = QPushButton("Search Again")
-        self.searchAgainButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.searchAgainButton.clicked.connect(self.searchAgain)
+        apply_shadow(self.searchAgainButton)  # Apply shadow effect
         self.layout.addWidget(self.searchAgainButton, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.setLayout(self.layout)
+
+    def loadStylesheet(self, stylesheet):
+        with open(stylesheet, "r") as f:
+            self.setStyleSheet(f.read())
 
     def searchAgain(self):
         self.infoLabel.setText("Searching for mixers...")
@@ -89,8 +90,8 @@ class MixerDiscoveryUI(QDialog):
             mixerLabel = QLabel(f"Mixer at {ip} - {details}")
             mixerLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
             mixerButton = QPushButton("Select")
-            mixerButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
             mixerButton.clicked.connect(lambda _, ip=ip, name=details.split('|')[1].strip(): self.chooseMixer(ip, name))
+            apply_shadow(mixerButton)  # Apply shadow effect
             self.mixerGridLayout.addWidget(mixerLabel, row, 0, alignment=Qt.AlignmentFlag.AlignCenter)
             self.mixerGridLayout.addWidget(mixerButton, row, 1)
             row += 1
@@ -108,7 +109,7 @@ class CustomFader(QSlider):
         self.client = client
         self.channel_num = channel_num
         self.scale_factor = 100  # Scale factor to convert float to int
-        self.precision_factor = 2  # Default precision factor
+        self.precision_factor = 1.5  # Default precision factor
         self.corrected_keys = [key.replace('‐', '-') for key in faderData.keys()]
         self.min_value = min(map(lambda x: int(float(x) * self.scale_factor), self.corrected_keys))
         self.max_value = max(map(lambda x: int(float(x) * self.scale_factor), self.corrected_keys))
@@ -128,10 +129,10 @@ class CustomFader(QSlider):
         interval = (rect.height() - 20) / (self.maximum() - self.minimum())
 
         # Define the positions and values for the labels we want to show
-        tick_positions = [10, 5, 0, -10, -20, -30, -40, -50, -70, -90]
+        tick_positions = [10, 5, 0, -10, -20, -40, -60, -70, -90]
         scaled_ticks = [int(tick * self.scale_factor) for tick in tick_positions]
         for tick in scaled_ticks:
-            y = rect.height() - ((tick - self.minimum()) * interval) - 10
+            y = rect.height() - ((tick - self.minimum()) * interval) - 9
             painter.drawLine(30, int(y), rect.width(), int(y))  # Adjusted the line position
             painter.drawText(-1, int(y) + 5, str(tick / self.scale_factor))  # Adjusted the label position
 
@@ -141,7 +142,7 @@ class CustomFader(QSlider):
         return QSize(120, 220)  # Increase width to ensure labels fit
 
     def setFineMode(self, is_fine):
-        self.precision_factor = 0.7 if is_fine else 2
+        self.precision_factor = 0.7 if is_fine else 1.5
 
     def sendOscMessage(self):
         db_value = self.value() / self.scale_factor
@@ -186,21 +187,21 @@ class AudioPilotUI(QWidget):
         self.setWindowTitle('Audio Pilot')
         self.setWindowIcon(QIcon(LOGO_PATH))
         self.setGeometry(100, 100, 1366, 768)  # Adjust the initial window size
-        self.setStyleSheet(f"background-color: {BACKGROUND_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        self.loadStylesheet("styles.qss")
 
         self.mainLayout = QVBoxLayout()
 
         headerLayout = QHBoxLayout()
         self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerName}")
         self.mixerLabel.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.mixerLabel.setStyleSheet(f"background-color: {BACKGROUND_COLOR}; color: {TEXT_COLOR}; {font_style}")
         headerLayout.addWidget(self.mixerLabel)
         
         # Disconnect button
         self.disconnectButton = QPushButton("Disconnect")
-        self.disconnectButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        self.disconnectButton.setFixedSize(100, 38)  # Smaller size for disconnect button
         self.disconnectButton.clicked.connect(self.disconnect)
-        headerLayout.addWidget(self.disconnectButton, alignment=Qt.AlignmentFlag.AlignRight)
+        apply_shadow(self.disconnectButton)  # Apply shadow effect
+        headerLayout.addWidget(self.disconnectButton, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.mainLayout.addLayout(headerLayout)
 
@@ -209,17 +210,18 @@ class AudioPilotUI(QWidget):
         leftPanelLayout = QVBoxLayout()
 
         self.toggleMuteButton = QPushButton("Mute")
+        self.toggleMuteButton.setObjectName("muteButton")
         self.toggleMuteButton.setCheckable(True)
-        self.toggleMuteButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.toggleMuteButton.clicked.connect(self.toggleMute)
+        apply_shadow(self.toggleMuteButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
         self.fader = CustomFader(self.client, self.channelNum, Qt.Orientation.Vertical)
         leftPanelLayout.addWidget(self.fader)
 
         self.selectChannelButton = QPushButton("Channel")
-        self.selectChannelButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.selectChannelButton.clicked.connect(self.showChannelSelector)
+        apply_shadow(self.selectChannelButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.selectChannelButton)
 
         topLayout.addLayout(leftPanelLayout)
@@ -237,23 +239,23 @@ class AudioPilotUI(QWidget):
 
         self.rtaToggle = QPushButton("RTA")
         self.rtaToggle.setCheckable(True)
-        self.rtaToggle.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.rtaToggle.setChecked(False)
         self.rtaToggle.clicked.connect(self.togglePlotUpdates)
+        apply_shadow(self.rtaToggle)  # Apply shadow effect
         eqControls.addWidget(self.rtaToggle)
 
         self.fineButton = QPushButton("Fine")
         self.fineButton.setCheckable(True)
-        self.fineButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.fineButton.setChecked(False)
         self.fineButton.clicked.connect(self.toggleFineMode)
+        apply_shadow(self.fineButton)  # Apply shadow effect
         eqControls.addWidget(self.fineButton)
 
         self.eqToggleButton = QPushButton("EQ")
         self.eqToggleButton.setCheckable(True)
-        self.eqToggleButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.eqToggleButton.setChecked(False)
         self.eqToggleButton.clicked.connect(self.toggleEQ)
+        apply_shadow(self.eqToggleButton)  # Apply shadow effect
         eqControls.addWidget(self.eqToggleButton)
 
         # Trim Control
@@ -265,6 +267,7 @@ class AudioPilotUI(QWidget):
         self.trimDial.setRange(int(min(trimValues.keys())), int(max(trimValues.keys())))
         self.trimDial.setValue(0)
         self.trimDial.valueChanged.connect(self.changeTrim)
+        apply_shadow(self.trimDial)  # Apply shadow effect
         trimLayout.addWidget(self.trimDial, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(trimLayout)
 
@@ -277,12 +280,13 @@ class AudioPilotUI(QWidget):
         self.lowcutDial.setRange(int(min(lowcutFreq.keys())), int(max(lowcutFreq.keys())))
         self.lowcutDial.setValue(100)
         self.lowcutDial.valueChanged.connect(self.changeLowCut)
+        apply_shadow(self.lowcutDial)  # Apply shadow effect
         lowcutLayout.addWidget(self.lowcutDial, alignment=Qt.AlignmentFlag.AlignCenter)
         self.lowCutToggleButton = QPushButton("Low Cut")
         self.lowCutToggleButton.setCheckable(True)
-        self.lowCutToggleButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.lowCutToggleButton.setChecked(False)
         self.lowCutToggleButton.clicked.connect(self.toggleLowCut)
+        apply_shadow(self.lowCutToggleButton)  # Apply shadow effect
         lowcutLayout.addWidget(self.lowCutToggleButton, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(lowcutLayout)
 
@@ -292,9 +296,9 @@ class AudioPilotUI(QWidget):
         eqTypeLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         eqTypeLayout.addWidget(eqTypeLabel, alignment=Qt.AlignmentFlag.AlignCenter)
         self.eqTypeDropdown = QComboBox()
-        self.eqTypeDropdown.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.eqTypeDropdown.addItems(["LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"])
         self.eqTypeDropdown.currentIndexChanged.connect(self.changeEQMode)  # Connect the signal to the handler
+        apply_shadow(self.eqTypeDropdown)  # Apply shadow effect
         eqTypeLayout.addWidget(self.eqTypeDropdown, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(eqTypeLayout)
 
@@ -302,13 +306,13 @@ class AudioPilotUI(QWidget):
         pitchLayout = QVBoxLayout()
         self.pitchToggle = QPushButton("AudioPilot")
         self.pitchToggle.setCheckable(True)
-        self.pitchToggle.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.pitchToggle.setChecked(False)
         self.pitchToggle.clicked.connect(self.togglePitchCorrection)
+        apply_shadow(self.pitchToggle)  # Apply shadow effect
         pitchLayout.addWidget(self.pitchToggle, alignment=Qt.AlignmentFlag.AlignCenter)
         self.pitchTypeSelector = QComboBox()
-        self.pitchTypeSelector.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
+        apply_shadow(self.pitchTypeSelector)  # Apply shadow effect
         pitchLayout.addWidget(self.pitchTypeSelector, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(pitchLayout)
 
@@ -324,10 +328,13 @@ class AudioPilotUI(QWidget):
             btn = QPushButton(band)
             btn.setCheckable(True)
             btn.setFixedSize(145, 35)
-            btn.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
             self.bandButtons.addButton(btn, index + 1)
             bandSelectionLayout.addWidget(btn)
         self.bandButtons.buttonClicked.connect(self.changeBand)
+        apply_shadow(self.bandButtons.button(1))  # Apply shadow effect to the first band button
+        apply_shadow(self.bandButtons.button(2))  # Apply shadow effect to the second band button
+        apply_shadow(self.bandButtons.button(3))  # Apply shadow effect to the third band button
+        apply_shadow(self.bandButtons.button(4)) # Apply shadow effect to the fourth band button
         eqControlsLayout.addLayout(bandSelectionLayout)
 
         dialsLayout = QHBoxLayout()
@@ -340,6 +347,7 @@ class AudioPilotUI(QWidget):
         self.freqDial.setValue(1000)
         self.freqDial.setFixedSize(80, 80)
         self.freqDial.valueChanged.connect(self.changeFreq)
+        apply_shadow(self.freqDial)  # Apply shadow effect
         freqLayout.addWidget(freqLabel)
         freqLayout.addWidget(self.freqDial)
         dialsLayout.addLayout(freqLayout)
@@ -352,6 +360,7 @@ class AudioPilotUI(QWidget):
         self.qDial.setValue(5)
         self.qDial.setFixedSize(80, 80)
         self.qDial.valueChanged.connect(self.changeQ)
+        apply_shadow(self.qDial)  # Apply shadow effect
         qLayout.addWidget(qLabel)
         qLayout.addWidget(self.qDial)
         dialsLayout.addLayout(qLayout)
@@ -364,6 +373,7 @@ class AudioPilotUI(QWidget):
         self.smallGainDial.setValue(0)
         self.smallGainDial.setFixedSize(80, 80)
         self.smallGainDial.valueChanged.connect(self.changeEqGain)
+        apply_shadow(self.smallGainDial)  # Apply shadow effect
         smallGainLayout.addWidget(smallGainLabel)
         smallGainLayout.addWidget(self.smallGainDial)
         dialsLayout.addLayout(smallGainLayout)
@@ -377,16 +387,16 @@ class AudioPilotUI(QWidget):
         default_band_button = self.bandButtons.button(self.selectedBand)
         if default_band_button:
             default_band_button.setChecked(True)
-            default_band_button.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}; color: {TEXT_COLOR}; {font_style}")
 
         self.setLayout(self.mainLayout)
         self.setWindowTitle('Audio Pilot')
 
+    def loadStylesheet(self, stylesheet):
+        with open(stylesheet, "r") as f:
+            self.setStyleSheet(f.read())
+
     def changeBand(self, button):
         self.selectedBand = self.bandButtons.id(button)
-        for btn in self.bandButtons.buttons():
-            btn.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
-        button.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}; color: {TEXT_COLOR}; {font_style}")
 
     def changeEQMode(self, index):
         if self.channelNum is None:
@@ -400,16 +410,13 @@ class AudioPilotUI(QWidget):
 
     def toggleFineMode(self):
         is_fine = self.fineButton.isChecked()
-        self.fineButton.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}" if is_fine else f"background-color: {BUTTON_COLOR}")
         self.fader.setFineMode(is_fine)
 
     def togglePlotUpdates(self):
         if self.rtaToggle.isChecked() and self.plotMgr is not None:
-            self.rtaToggle.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}")
             if not self.plotMgr.plottingActive:
                 self.plotMgr.start()
         else:
-            self.rtaToggle.setStyleSheet(f"background-color: {BUTTON_COLOR}")
             if self.plotMgr is not None and self.plotMgr.plottingActive:
                 self.plotMgr.shutdown()
                 self.clearPlot()
@@ -452,20 +459,17 @@ class AudioPilotUI(QWidget):
             channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
             if self.toggleMuteButton.isChecked():
                 self.client.send_message(f'/ch/{channel_num_formatted}/mix/on', 0)
-                self.toggleMuteButton.setStyleSheet(f"background-color: #A40606")
                 print(f"Channel {channel_num_formatted} is muted.")
             else:
                 self.client.send_message(f'/ch/{channel_num_formatted}/mix/on', 1)
-                self.toggleMuteButton.setStyleSheet(f"background-color: {BUTTON_COLOR}")
                 print(f"Channel {channel_num_formatted} is unmuted.")
+
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
-            self.pitchToggle.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}")
             vocalType = self.pitchTypeSelector.currentText()
             self.startBandManager(vocalType)
         else:
-            self.pitchToggle.setStyleSheet(f"background-color: {BUTTON_COLOR}")
             self.stopBandManager()
 
     def startBandManager(self, vocalType):
@@ -542,7 +546,6 @@ class AudioPilotUI(QWidget):
         state = 1 if self.eqToggleButton.isChecked() else 0
         channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
         self.client.send_message(f'/ch/{channel_num_formatted}/eq/on/', [state])
-        self.eqToggleButton.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}" if state else f"background-color: {BUTTON_COLOR}")
 
     def toggleLowCut(self):
         if self.channelNum is None:
@@ -551,7 +554,6 @@ class AudioPilotUI(QWidget):
         state = 1 if self.lowCutToggleButton.isChecked() else 0
         channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
         self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon', [state])
-        self.lowCutToggleButton.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}" if state else f"background-color: {BUTTON_COLOR}")
 
     def applyBlurEffect(self):
         blur = QGraphicsBlurEffect()
@@ -587,19 +589,22 @@ class ChannelSelectorDialog(QDialog):
         self.initUI()
 
     def initUI(self):
-        self.setStyleSheet(f"background-color: {BACKGROUND_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        self.loadStylesheet("styles.qss")
         layout = QGridLayout()
         self.button_group = QButtonGroup(self)
 
         for i in range(1, 33):
             btn = QPushButton(f"CH {i:02}")
             btn.setCheckable(True)
-            btn.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
             btn.clicked.connect(self.chooseChannel)
             self.button_group.addButton(btn, i)
             layout.addWidget(btn, (i-1)//8, (i-1)%8)
 
         self.setLayout(layout)
+
+    def loadStylesheet(self, stylesheet):
+        with open(stylesheet, "r") as f:
+            self.setStyleSheet(f.read())
 
     def chooseChannel(self):
         selectedButton = self.button_group.checkedButton()

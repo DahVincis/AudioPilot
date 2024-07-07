@@ -36,6 +36,10 @@ class OSCServerThread(QThread):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
+    # Load QSS stylesheet
+    with open("styles.qss", "r") as f:
+        app.setStyleSheet(f.read())
+
     # Path to your logo image
     LOGO_PATH = "AudioPilot_Logo2.png"
 
