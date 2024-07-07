@@ -555,7 +555,7 @@ class AudioPilotUI(QWidget):
 
     def applyBlurEffect(self):
         blur = QGraphicsBlurEffect()
-        blur.setBlurRadius(10)
+        blur.setBlurRadius(20)
         self.setGraphicsEffect(blur)
 
     def removeBlurEffect(self):
