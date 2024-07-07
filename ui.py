@@ -381,8 +381,6 @@ class AudioPilotUI(QWidget):
 
         self.setLayout(self.mainLayout)
         self.setWindowTitle('Audio Pilot')
-        self.applyBlurEffect()
-        self.show()
 
     def changeBand(self, button):
         self.selectedBand = self.bandButtons.id(button)
@@ -569,9 +567,11 @@ class AudioPilotUI(QWidget):
 
     def disconnect(self):
         from PyQt6.QtWidgets import QApplication
+        from main import center_widget
         self.stopPlotting()
         self.applyBlurEffect()  # Apply blur effect before showing MixerDiscoveryUI
         self.mixerDiscovery = MixerDiscoveryUI(self)  # Pass self as parent to keep it modal
+        center_widget(self.mixerDiscovery, self)
         self.mixerDiscovery.exec()
         if self.mixerDiscovery.result() == QDialog.DialogCode.Accepted:
             self.mixerName = self.mixerDiscovery.selectedMixerName

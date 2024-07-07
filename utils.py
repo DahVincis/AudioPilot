@@ -31,6 +31,7 @@ class ApplicationManager:
         app = QApplication([])
         from ui import AudioPilotUI  # local import to avoid circular dependency
         mixerUI = AudioPilotUI(self.mixerName, self.client)
+        mixerUI.show()
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI

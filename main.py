@@ -50,6 +50,8 @@ if __name__ == "__main__":
 
     # Initialize AudioPilotUI but don't show it yet
     audio_pilot_ui = AudioPilotUI("", None)
+    audio_pilot_ui.applyBlurEffect()
+    audio_pilot_ui.show()
 
     mixerDiscoveryDialog = MixerDiscoveryUI()
     mixerDiscoveryDialog.setParent(audio_pilot_ui, Qt.WindowType.Dialog)
@@ -58,6 +60,7 @@ if __name__ == "__main__":
 
     # Show mixer discovery dialog first
     if mixerDiscoveryDialog.exec() == QDialog.DialogCode.Accepted:
+        audio_pilot_ui.close()
         chosenIP = mixerDiscoveryDialog.selectedMixerIp
         chosenName = mixerDiscoveryDialog.selectedMixerName
         client = SimpleUDPClient(chosenIP, 10023)
@@ -78,10 +81,10 @@ if __name__ == "__main__":
         client._sock = server.socket
 
         # Update AudioPilotUI with the selected mixer details
-        audio_pilot_ui.mixerName = chosenName
-        audio_pilot_ui.client = client
-        audio_pilot_ui.updateUI()  # Update the UI with the new mixer settings
-        audio_pilot_ui.show()
+        apUI = audio_pilot_ui
+        apUI.mixerName = chosenName
+        apUI.client = client
+        apUI.updateUI()  # Update the UI with the new mixer settings
 
         oscServerThread = OSCServerThread(server)
         oscServerThread.start()
