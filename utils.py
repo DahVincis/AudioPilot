@@ -35,9 +35,6 @@ class ApplicationManager:
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
 
-        threadServerOSC = threading.Thread(target=self.server.serve_forever, daemon=True)
-        threadServerOSC.start()
-
         sys.exit(app.exec())
 
 class MixerManager:

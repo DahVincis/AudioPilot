@@ -41,8 +41,8 @@ class MixerDiscoveryWorker(QThread):
         self.mixersFound.emit(availableMixers)
 
 class MixerDiscoveryUI(QDialog):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("Mixer Discovery")
         self.setWindowIcon(QIcon(LOGO_PATH))
         self.setGeometry(100, 100, 400, 200)
@@ -379,21 +379,10 @@ class AudioPilotUI(QWidget):
             default_band_button.setChecked(True)
             default_band_button.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}; color: {TEXT_COLOR}; {font_style}")
 
+        self.setLayout(self.mainLayout)
         self.setWindowTitle('Audio Pilot')
         self.applyBlurEffect()
         self.show()
-
-    def applyBlurEffect(self):
-        blur = QGraphicsBlurEffect()
-        blur.setBlurRadius(10)
-        self.setGraphicsEffect(blur)
-
-    def removeBlurEffect(self):
-        self.setGraphicsEffect(None)
-
-    def updateUI(self):
-        self.mixerLabel.setText(f"Connected to Mixer: {self.mixerName}")
-        self.removeBlurEffect()
 
     def changeBand(self, button):
         self.selectedBand = self.bandButtons.id(button)
@@ -566,11 +555,23 @@ class AudioPilotUI(QWidget):
         self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon', [state])
         self.lowCutToggleButton.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}" if state else f"background-color: {BUTTON_COLOR}")
 
+    def applyBlurEffect(self):
+        blur = QGraphicsBlurEffect()
+        blur.setBlurRadius(10)
+        self.setGraphicsEffect(blur)
+
+    def removeBlurEffect(self):
+        self.setGraphicsEffect(None)
+
+    def updateUI(self):
+        self.mixerLabel.setText(f"Connected to Mixer: {self.mixerName}")
+        self.removeBlurEffect()
+
     def disconnect(self):
         from PyQt6.QtWidgets import QApplication
         self.stopPlotting()
-        self.close()
-        self.mixerDiscovery = MixerDiscoveryUI()
+        self.applyBlurEffect()  # Apply blur effect before showing MixerDiscoveryUI
+        self.mixerDiscovery = MixerDiscoveryUI(self)  # Pass self as parent to keep it modal
         self.mixerDiscovery.exec()
         if self.mixerDiscovery.result() == QDialog.DialogCode.Accepted:
             self.mixerName = self.mixerDiscovery.selectedMixerName
