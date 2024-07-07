@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
-    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QButtonGroup
+    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QButtonGroup, QGraphicsBlurEffect
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QThread, QSize
 from PyQt6.QtGui import QPainter, QColor, QIcon
@@ -39,8 +39,6 @@ class MixerDiscoveryWorker(QThread):
     def run(self):
         availableMixers = self.mixerScanner.discoverMixers()
         self.mixersFound.emit(availableMixers)
-
-# Imports and constants remain unchanged
 
 class MixerDiscoveryUI(QDialog):
     def __init__(self):
@@ -190,7 +188,7 @@ class AudioPilotUI(QWidget):
         self.setGeometry(100, 100, 1366, 768)  # Adjust the initial window size
         self.setStyleSheet(f"background-color: {BACKGROUND_COLOR}; color: {TEXT_COLOR}; {font_style}")
 
-        mainLayout = QVBoxLayout()
+        self.mainLayout = QVBoxLayout()
 
         headerLayout = QHBoxLayout()
         self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerName}")
@@ -204,7 +202,7 @@ class AudioPilotUI(QWidget):
         self.disconnectButton.clicked.connect(self.disconnect)
         headerLayout.addWidget(self.disconnectButton, alignment=Qt.AlignmentFlag.AlignRight)
 
-        mainLayout.addLayout(headerLayout)
+        self.mainLayout.addLayout(headerLayout)
 
         topLayout = QHBoxLayout()
 
@@ -296,6 +294,7 @@ class AudioPilotUI(QWidget):
         self.eqTypeDropdown = QComboBox()
         self.eqTypeDropdown.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
         self.eqTypeDropdown.addItems(["LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"])
+        self.eqTypeDropdown.currentIndexChanged.connect(self.changeEQMode)  # Connect the signal to the handler
         eqTypeLayout.addWidget(self.eqTypeDropdown, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(eqTypeLayout)
 
@@ -314,7 +313,7 @@ class AudioPilotUI(QWidget):
         eqControls.addLayout(pitchLayout)
 
         topLayout.addLayout(eqControls)
-        mainLayout.addLayout(topLayout)
+        self.mainLayout.addLayout(topLayout)
 
         eqControlsLayout = QVBoxLayout()
 
@@ -370,11 +369,47 @@ class AudioPilotUI(QWidget):
         dialsLayout.addLayout(smallGainLayout)
 
         eqControlsLayout.addLayout(dialsLayout)
-        mainLayout.addLayout(eqControlsLayout)
+        self.mainLayout.addLayout(eqControlsLayout)
 
-        self.setLayout(mainLayout)
+        self.setLayout(self.mainLayout)
+
+        # Set the default band button to be checked and update its style
+        default_band_button = self.bandButtons.button(self.selectedBand)
+        if default_band_button:
+            default_band_button.setChecked(True)
+            default_band_button.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}; color: {TEXT_COLOR}; {font_style}")
+
         self.setWindowTitle('Audio Pilot')
+        self.applyBlurEffect()
         self.show()
+
+    def applyBlurEffect(self):
+        blur = QGraphicsBlurEffect()
+        blur.setBlurRadius(10)
+        self.setGraphicsEffect(blur)
+
+    def removeBlurEffect(self):
+        self.setGraphicsEffect(None)
+
+    def updateUI(self):
+        self.mixerLabel.setText(f"Connected to Mixer: {self.mixerName}")
+        self.removeBlurEffect()
+
+    def changeBand(self, button):
+        self.selectedBand = self.bandButtons.id(button)
+        for btn in self.bandButtons.buttons():
+            btn.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        button.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}; color: {TEXT_COLOR}; {font_style}")
+
+    def changeEQMode(self, index):
+        if self.channelNum is None:
+            print("Channel number is not set.")
+            return
+        
+        eq_mode_id = index  # Since the index corresponds to the enum value 0..5
+        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/type', [eq_mode_id])
+        print(f'Sent OSC message: /ch/{channel_num_formatted}/eq/{self.selectedBand}/type {eq_mode_id}')
 
     def toggleFineMode(self):
         is_fine = self.fineButton.isChecked()
@@ -382,7 +417,7 @@ class AudioPilotUI(QWidget):
         self.fader.setFineMode(is_fine)
 
     def togglePlotUpdates(self):
-        if (self.rtaToggle.isChecked() and self.plotMgr is not None):
+        if self.rtaToggle.isChecked() and self.plotMgr is not None:
             self.rtaToggle.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}")
             if not self.plotMgr.plottingActive:
                 self.plotMgr.start()
@@ -462,12 +497,6 @@ class AudioPilotUI(QWidget):
             self.bandMgr.updateAllBands(vocalType, channel)
             time.sleep(0.3)
 
-    def changeBand(self, button):
-        self.selectedBand = self.bandButtons.id(button)
-        for btn in self.bandButtons.buttons():
-            btn.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
-        button.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}; color: {TEXT_COLOR}; {font_style}")
-
     def changeEqGain(self, value):
         if self.channelNum is None:
             print("Channel number is not set.")
@@ -536,7 +565,7 @@ class AudioPilotUI(QWidget):
         channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
         self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon', [state])
         self.lowCutToggleButton.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}" if state else f"background-color: {BUTTON_COLOR}")
-    
+
     def disconnect(self):
         from PyQt6.QtWidgets import QApplication
         self.stopPlotting()
@@ -546,7 +575,7 @@ class AudioPilotUI(QWidget):
         if self.mixerDiscovery.result() == QDialog.DialogCode.Accepted:
             self.mixerName = self.mixerDiscovery.selectedMixerName
             self.client = SimpleUDPClient(self.mixerDiscovery.selectedMixerIp, 10023)
-            self.initUI()
+            self.updateUI()
         else:
             QApplication.quit()
 
