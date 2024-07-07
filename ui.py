@@ -7,6 +7,7 @@ from PyQt6.QtGui import QPainter, QColor, QIcon
 import pyqtgraph as pg
 import threading
 import time
+from pythonosc.udp_client import SimpleUDPClient
 
 from utils import MixerDiscovery, PlotManager, BandManager
 from Data import faderData, eqGainValues, lowcutFreq, eqFreq, qValues, trimValues
@@ -60,7 +61,18 @@ class MixerDiscoveryUI(QDialog):
         self.layout.addWidget(self.infoLabel)
         self.mixerGridLayout = QGridLayout()
         self.layout.addLayout(self.mixerGridLayout)
+
+        # Search Again button
+        self.searchAgainButton = QPushButton("Search Again")
+        self.searchAgainButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        self.searchAgainButton.clicked.connect(self.searchAgain)
+        self.layout.addWidget(self.searchAgainButton, alignment=Qt.AlignmentFlag.AlignCenter)
+
         self.setLayout(self.layout)
+
+    def searchAgain(self):
+        self.infoLabel.setText("Searching for mixers...")
+        self.mixerWorker.start()
 
     @pyqtSlot(dict)
     def updateMixerGrid(self, availableMixers):
@@ -182,9 +194,16 @@ class AudioPilotUI(QWidget):
 
         headerLayout = QHBoxLayout()
         self.mixerLabel = QLabel(f"Connected to Mixer: {self.mixerName}")
-        self.mixerLabel.setAlignment(Qt.AlignmentFlag.AlignLeft)  # Align the mixerLabel to the left
+        self.mixerLabel.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.mixerLabel.setStyleSheet(f"background-color: {BACKGROUND_COLOR}; color: {TEXT_COLOR}; {font_style}")
         headerLayout.addWidget(self.mixerLabel)
+        
+        # Disconnect button
+        self.disconnectButton = QPushButton("Disconnect")
+        self.disconnectButton.setStyleSheet(f"background-color: {BUTTON_COLOR}; color: {TEXT_COLOR}; {font_style}")
+        self.disconnectButton.clicked.connect(self.disconnect)
+        headerLayout.addWidget(self.disconnectButton, alignment=Qt.AlignmentFlag.AlignRight)
+
         mainLayout.addLayout(headerLayout)
 
         topLayout = QHBoxLayout()
@@ -517,6 +536,19 @@ class AudioPilotUI(QWidget):
         channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
         self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon', [state])
         self.lowCutToggleButton.setStyleSheet(f"background-color: {BUTTON_SELECTED_COLOR}" if state else f"background-color: {BUTTON_COLOR}")
+    
+    def disconnect(self):
+        from PyQt6.QtWidgets import QApplication
+        self.stopPlotting()
+        self.close()
+        self.mixerDiscovery = MixerDiscoveryUI()
+        self.mixerDiscovery.exec()
+        if self.mixerDiscovery.result() == QDialog.DialogCode.Accepted:
+            self.mixerName = self.mixerDiscovery.selectedMixerName
+            self.client = SimpleUDPClient(self.mixerDiscovery.selectedMixerIp, 10023)
+            self.initUI()
+        else:
+            QApplication.quit()
 
 class ChannelSelectorDialog(QDialog):
     def __init__(self, parent=None):

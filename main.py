@@ -29,29 +29,29 @@ if __name__ == "__main__":
         app_icon.addPixmap(scaled)
     
     app.setWindowIcon(app_icon)  # Set the application icon globally
+    while True:
+        mixerDiscoveryDialog = MixerDiscoveryUI()
+        if mixerDiscoveryDialog.exec() == QDialog.DialogCode.Accepted:
+            chosenIP = mixerDiscoveryDialog.selectedMixerIp
+            chosenName = mixerDiscoveryDialog.selectedMixerName
+            client = SimpleUDPClient(chosenIP, 10023)
 
-    mixerDiscoveryDialog = MixerDiscoveryUI()
-    if mixerDiscoveryDialog.exec() == QDialog.DialogCode.Accepted:
-        chosenIP = mixerDiscoveryDialog.selectedMixerIp
-        chosenName = mixerDiscoveryDialog.selectedMixerName
-        client = SimpleUDPClient(chosenIP, 10023)
+            parser = argparse.ArgumentParser()
+            parser.add_argument("--ip", default="0.0.0.0", help="The IP to listen on")
+            parser.add_argument("--port", type=int, default=10024, help="The port to listen on")
+            args = parser.parse_args()
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--ip", default="0.0.0.0", help="The IP to listen on")
-        parser.add_argument("--port", type=int, default=10024, help="The port to listen on")
-        args = parser.parse_args()
+            dispatcher = Dispatcher()
+            subRTA = RTASubscriber(client)
+            faderHandler = OscHandlers()
+            dispatcher.map("/meters", subRTA.handlerRTA)
+            dispatcher.map("/fader", faderHandler.handlerFader)
 
-        dispatcher = Dispatcher()
-        subRTA = RTASubscriber(client)
-        faderHandler = OscHandlers()
-        dispatcher.map("/meters", subRTA.handlerRTA)
-        dispatcher.map("/fader", faderHandler.handlerFader)
+            server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
+            print(f"Serving on {server.server_address}")
+            client._sock = server.socket
 
-        server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
-        print(f"Serving on {server.server_address}")
-        client._sock = server.socket
-
-        appManager = ApplicationManager(client, server, chosenName)  # Pass the mixer name
-        appManager.run()
-    else:
-        sys.exit()
+            appManager = ApplicationManager(client, server, chosenName)
+            appManager.run()
+        else:
+            sys.exit()
