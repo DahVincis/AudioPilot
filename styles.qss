@@ -9,7 +9,7 @@ QWidget {
 
 /* Button Styles */
 QPushButton {
-    background-color: #00134d; /* Your custom background color */
+    background-color: #02217c; /* Your custom background color */
     border: 1px solid #cb4c00;
     border-radius: 4px; /* Equivalent to .5rem */
     color: #D3D3D3; /* Your custom text color */
@@ -44,7 +44,7 @@ QPushButton:checked {
 
 /* Dropdown Styles */
 QComboBox {
-    background-color: #00134d; /* Your custom background color */
+    background-color: #02217c; /* Your custom background color */
     border: 1px solid #cb4c00;
     border-radius: 4px;
     color: #D3D3D3;
@@ -56,14 +56,14 @@ QComboBox {
 }
 
 QComboBox QAbstractItemView {
-    background-color: #00134d; /* Your custom dropdown background color */
+    background-color: #02217c; /* Your custom dropdown background color */
     color: #D3D3D3;
 }
 
 /* Dial Styles */
 QDial {
     background-color: #af480d; /* Background color of the dial */
-    border: 1px solid #00134d;
+    border: 1px solid #02217c;
     border-radius: 8px;
 }
 
@@ -74,7 +74,7 @@ QDial::groove {
 
 QDial::handle {
     background: #cb4c00; /* Handle color */
-    border: 1px solid #00134d;
+    border: 1px solid #02217c;
     width: 16px;
     height: 16px;
     border-radius: 8px;
@@ -83,14 +83,14 @@ QDial::handle {
 /* Slider (Fader) Styles */
 QSlider::groove:vertical {
     border: 1px solid #cb4c00;
-    background: #00134d;
+    background: #02217c;
     width: 2px;
     border-radius: 3px;
 }
 
 QSlider::handle:vertical {
     background: #af480d; /* Handle color */
-    border: 1px solid #00134d;
+    border: 1px solid #02217c;
     height: 50px;
     margin: -5px; /* Center handle */
     border-radius: 10px;

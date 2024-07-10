@@ -1,6 +1,6 @@
 import sys
 import argparse
-from PyQt6.QtWidgets import QApplication, QDialog, QWidget
+from PyQt6.QtWidgets import QApplication, QDialog
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
 from ctypes import windll
