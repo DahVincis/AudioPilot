@@ -31,12 +31,10 @@ class ApplicationManager:
         app = QApplication([])
         from ui import AudioPilotUI  # local import to avoid circular dependency
         mixerUI = AudioPilotUI(self.mixerName, self.client)
+        mixerUI.show()
 
         plotMgr = PlotManager(mixerUI.plot)
         mixerUI.plotMgr = plotMgr  # assign the plot manager to the UI
-
-        threadServerOSC = threading.Thread(target=self.server.serve_forever, daemon=True)
-        threadServerOSC.start()
 
         sys.exit(app.exec())
 
@@ -61,7 +59,7 @@ class PlotManager(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.updatePlot)
         self.plottingActive = False
-        self.plotDataUpdated.connect(self._updatePlotUI)
+        self.plotDataUpdated.connect(self.updatePlotUI)
 
     def start(self):
         if not self.plottingActive:
@@ -72,10 +70,10 @@ class PlotManager(QObject):
 
     def updatePlot(self):
         if self.executor:
-            future = self.executor.submit(self._processPlotData)
-            future.add_done_callback(self._updatePlotCallback)
+            future = self.executor.submit(self.processPlotData)
+            future.add_done_callback(self.updatePlotCallback)
 
-    def _processPlotData(self):
+    def processPlotData(self):
         try:
             latestData = queueRTA.get_nowait()
             threshUpper = -10
@@ -91,14 +89,14 @@ class PlotManager(QObject):
         except Empty:
             return []
 
-    def _updatePlotCallback(self, future):
+    def updatePlotCallback(self, future):
         try:
             plotData = future.result()
             self.plotDataUpdated.emit(plotData)
         except Exception as e:
             print(f"Error updating plot: {e}")
 
-    def _updatePlotUI(self, plot_data):
+    def updatePlotUI(self, plot_data):
         with self.lock:
             for freq, dbLatest, color in plot_data:
                 if freq in self.bars:
@@ -289,7 +287,7 @@ class MixerDiscovery:
             pass
 
     def discoverMixers(self):
-        from osc_handlers import FaderHandler
+        from osc_handlers import OscHandlers
         discIPs = {}
         with ThreadPoolExecutor(max_workers=100) as executor:
             futures = {executor.submit(self.checkMixerIP, f"{subnet}.{i}"): f"{subnet}.{i}" for subnet in self.subnets for i in range(256)}
@@ -297,6 +295,6 @@ class MixerDiscovery:
                 result = future.result()
                 if result:
                     ip, rawData = result
-                    details = FaderHandler().handlerXInfo(rawData)
+                    details = OscHandlers().handlerXInfo(rawData)
                     discIPs[ip] = details
         return discIPs
