@@ -16,13 +16,13 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-LOGO_PATH = "AudioPilot_Logo2.png"
+logoPath = "AudioPilot_Logo2.png"
 
-def apply_shadow(widget, blur_radius=15, x_offset=3, y_offset=3, color=QColor(0, 0, 0, 160)):
+def widgetShadow(widget, shadowRadius=15, xOffset=3, yOffset=3, color=QColor(0, 0, 0, 160)):
     shadow = QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(blur_radius)
-    shadow.setXOffset(x_offset)
-    shadow.setYOffset(y_offset)
+    shadow.setBlurRadius(shadowRadius)
+    shadow.setXOffset(xOffset)
+    shadow.setYOffset(yOffset)
     shadow.setColor(color)
     widget.setGraphicsEffect(shadow)
 
@@ -41,7 +41,7 @@ class MixerDiscoveryUI(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Mixer Discovery")
-        self.setWindowIcon(QIcon(LOGO_PATH))
+        self.setWindowIcon(QIcon(logoPath))
         self.setGeometry(100, 100, 400, 200)
         self.initUI()
         self.mixerWorker = MixerDiscoveryWorker()
@@ -60,7 +60,7 @@ class MixerDiscoveryUI(QDialog):
         # Search Again button
         self.searchAgainButton = QPushButton("Search Again")
         self.searchAgainButton.clicked.connect(self.searchAgain)
-        apply_shadow(self.searchAgainButton)  # Apply shadow effect
+        widgetShadow(self.searchAgainButton)  # Apply shadow effect
         self.layout.addWidget(self.searchAgainButton, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.setLayout(self.layout)
@@ -91,7 +91,7 @@ class MixerDiscoveryUI(QDialog):
             mixerLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
             mixerButton = QPushButton("Select")
             mixerButton.clicked.connect(lambda _, ip=ip, name=details.split('|')[1].strip(): self.chooseMixer(ip, name))
-            apply_shadow(mixerButton)  # Apply shadow effect
+            widgetShadow(mixerButton)  # Apply shadow effect
             self.mixerGridLayout.addWidget(mixerLabel, row, 0, alignment=Qt.AlignmentFlag.AlignCenter)
             self.mixerGridLayout.addWidget(mixerButton, row, 1)
             row += 1
@@ -104,19 +104,19 @@ class MixerDiscoveryUI(QDialog):
 class CustomFader(QSlider):
     valueChangedSignal = pyqtSignal(float)
 
-    def __init__(self, client, channel_num, *args, **kwargs):
+    def __init__(self, client, channelNumber, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
-        self.channel_num = channel_num
-        self.scale_factor = 100  # Scale factor to convert float to int
-        self.precision_factor = 1.5  # Default precision factor
-        self.corrected_keys = [key.replace('‐', '-') for key in faderData.keys()]
-        self.min_value = min(map(lambda x: int(float(x) * self.scale_factor), self.corrected_keys))
-        self.max_value = max(map(lambda x: int(float(x) * self.scale_factor), self.corrected_keys))
-        self.setRange(self.min_value, self.max_value)
+        self.channelNumber = channelNumber
+        self.scaleFactor = 100  # Scale factor to convert float to int
+        self.precisionLevel = 1.5  # Default precision factor
+        self.adjustedKeys = [key.replace('‐', '-') for key in faderData.keys()]
+        self.minVal = min(map(lambda x: int(float(x) * self.scaleFactor), self.adjustedKeys))
+        self.maxVal = max(map(lambda x: int(float(x) * self.scaleFactor), self.adjustedKeys))
+        self.setRange(self.minVal, self.maxVal)
         self.setValue(0)
         self.valueChanged.connect(self.sendOscMessage)
-        self.tick_interval = (self.maximum() - self.minimum()) / 10
+        self.tickInterval = (self.maximum() - self.minimum()) / 10
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -129,45 +129,45 @@ class CustomFader(QSlider):
         interval = (rect.height() - 20) / (self.maximum() - self.minimum())
 
         # Define the positions and values for the labels we want to show
-        tick_positions = [10, 5, 0, -10, -20, -40, -60, -70, -90]
-        scaled_ticks = [int(tick * self.scale_factor) for tick in tick_positions]
-        for tick in scaled_ticks:
+        positionTicks = [10, 5, 0, -10, -20, -40, -60, -70, -90]
+        scaledTicks = [int(tick * self.scaleFactor) for tick in positionTicks]
+        for tick in scaledTicks:
             y = rect.height() - ((tick - self.minimum()) * interval) - 9
             painter.drawLine(30, int(y), rect.width(), int(y))  # Adjusted the line position
-            painter.drawText(-1, int(y) + 5, str(tick / self.scale_factor))  # Adjusted the label position
+            painter.drawText(-1, int(y) + 5, str(tick / self.scaleFactor))  # Adjusted the label position
 
         painter.end()
 
     def sizeHint(self):
         return QSize(120, 220)  # Increase width to ensure labels fit
 
-    def setFineMode(self, is_fine):
-        self.precision_factor = 0.7 if is_fine else 1.5
+    def setFineMode(self, isFine):
+        self.precisionLevel = 0.7 if isFine else 1.5
 
     def sendOscMessage(self):
-        db_value = self.value() / self.scale_factor
-        corrected_keys = {key.replace('‐', '-'): value for key, value in faderData.items()}
-        float_id = corrected_keys.get(str(db_value), None)
-        if float_id is not None and self.channel_num is not None:
-            channel_num_formatted = f"{self.channel_num+1:02}"  # Format channel_num as two-digit
-            self.client.send_message(f'/ch/{channel_num_formatted}/mix/fader', [float_id])
-            self.valueChangedSignal.emit(float_id)
-            logging.debug(f'Sent OSC message: /ch/{channel_num_formatted}/mix/fader {float_id}')
+        scaledDbValue = self.value() / self.scaleFactor
+        updatedKeys = {key.replace('‐', '-'): value for key, value in faderData.items()}
+        oscFloatID = updatedKeys.get(str(scaledDbValue), None)
+        if oscFloatID is not None and self.channelNumber is not None:
+            channelNumberFormatted = f"{self.channelNumber+1:02}"  # Format channel_num as two-digit
+            self.client.send_message(f'/ch/{channelNumberFormatted}/mix/fader', [oscFloatID])
+            self.valueChangedSignal.emit(oscFloatID)
+            logging.debug(f'Sent OSC message: /ch/{channelNumberFormatted}/mix/fader {oscFloatID}')
 
     def wheelEvent(self, event):
         steps = event.angleDelta().y() / 120
-        new_value = self.value() + int(steps * self.precision_factor * self.scale_factor)
-        new_value = max(self.minimum(), min(self.maximum(), new_value))
-        if new_value != self.value():
-            self.setValue(new_value)
+        updatedValue = self.value() + int(steps * self.precisionLevel * self.scaleFactor)
+        updatedValue = max(self.minimum(), min(self.maximum(), updatedValue))
+        if updatedValue != self.value():
+            self.setValue(updatedValue)
             self.sendOscMessage()  # Send OSC message when scrolling
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton:
-            new_value = self.minimum() + ((self.maximum() - self.minimum()) * (self.height() - event.position().y()) / self.height())
-            new_value = int(new_value / self.precision_factor) * self.precision_factor
-            if new_value != self.value():
-                self.setValue(int(new_value))
+            scaledValue = self.minimum() + ((self.maximum() - self.minimum()) * (self.height() - event.position().y()) / self.height())
+            scaledValue = int(scaledValue / self.precisionLevel) * self.precisionLevel
+            if scaledValue != self.value():
+                self.setValue(int(scaledValue))
                 self.sendOscMessage()  # Send OSC message when dragging
 
 class AudioPilotUI(QWidget):
@@ -185,7 +185,7 @@ class AudioPilotUI(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Audio Pilot')
-        self.setWindowIcon(QIcon(LOGO_PATH))
+        self.setWindowIcon(QIcon(logoPath))
         self.setGeometry(100, 100, 1366, 768)  # Adjust the initial window size
         self.loadStylesheet("styles.qss")
 
@@ -200,7 +200,7 @@ class AudioPilotUI(QWidget):
         self.disconnectButton = QPushButton("Disconnect")
         self.disconnectButton.setFixedSize(100, 38)  # Smaller size for disconnect button
         self.disconnectButton.clicked.connect(self.disconnect)
-        apply_shadow(self.disconnectButton)  # Apply shadow effect
+        widgetShadow(self.disconnectButton)  # Apply shadow effect
         headerLayout.addWidget(self.disconnectButton, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.mainLayout.addLayout(headerLayout)
@@ -213,7 +213,7 @@ class AudioPilotUI(QWidget):
         self.toggleMuteButton.setObjectName("muteButton")
         self.toggleMuteButton.setCheckable(True)
         self.toggleMuteButton.clicked.connect(self.toggleMute)
-        apply_shadow(self.toggleMuteButton)  # Apply shadow effect
+        widgetShadow(self.toggleMuteButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
         self.fader = CustomFader(self.client, self.channelNum, Qt.Orientation.Vertical)
@@ -221,7 +221,7 @@ class AudioPilotUI(QWidget):
 
         self.selectChannelButton = QPushButton("Channel")
         self.selectChannelButton.clicked.connect(self.showChannelSelector)
-        apply_shadow(self.selectChannelButton)  # Apply shadow effect
+        widgetShadow(self.selectChannelButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.selectChannelButton)
 
         topLayout.addLayout(leftPanelLayout)
@@ -241,21 +241,21 @@ class AudioPilotUI(QWidget):
         self.rtaToggle.setCheckable(True)
         self.rtaToggle.setChecked(False)
         self.rtaToggle.clicked.connect(self.togglePlotUpdates)
-        apply_shadow(self.rtaToggle)  # Apply shadow effect
+        widgetShadow(self.rtaToggle)  # Apply shadow effect
         eqControls.addWidget(self.rtaToggle)
 
         self.fineButton = QPushButton("Fine")
         self.fineButton.setCheckable(True)
         self.fineButton.setChecked(False)
         self.fineButton.clicked.connect(self.toggleFineMode)
-        apply_shadow(self.fineButton)  # Apply shadow effect
+        widgetShadow(self.fineButton)  # Apply shadow effect
         eqControls.addWidget(self.fineButton)
 
         self.eqToggleButton = QPushButton("EQ")
         self.eqToggleButton.setCheckable(True)
         self.eqToggleButton.setChecked(False)
         self.eqToggleButton.clicked.connect(self.toggleEQ)
-        apply_shadow(self.eqToggleButton)  # Apply shadow effect
+        widgetShadow(self.eqToggleButton)  # Apply shadow effect
         eqControls.addWidget(self.eqToggleButton)
 
         # Trim Control
@@ -267,7 +267,7 @@ class AudioPilotUI(QWidget):
         self.trimDial.setRange(int(min(trimValues.keys())), int(max(trimValues.keys())))
         self.trimDial.setValue(0)
         self.trimDial.valueChanged.connect(self.changeTrim)
-        apply_shadow(self.trimDial)  # Apply shadow effect
+        widgetShadow(self.trimDial)  # Apply shadow effect
         trimLayout.addWidget(self.trimDial, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(trimLayout)
 
@@ -280,13 +280,13 @@ class AudioPilotUI(QWidget):
         self.lowcutDial.setRange(int(min(lowcutFreq.keys())), int(max(lowcutFreq.keys())))
         self.lowcutDial.setValue(100)
         self.lowcutDial.valueChanged.connect(self.changeLowCut)
-        apply_shadow(self.lowcutDial)  # Apply shadow effect
+        widgetShadow(self.lowcutDial)  # Apply shadow effect
         lowcutLayout.addWidget(self.lowcutDial, alignment=Qt.AlignmentFlag.AlignCenter)
         self.lowCutToggleButton = QPushButton("Low Cut")
         self.lowCutToggleButton.setCheckable(True)
         self.lowCutToggleButton.setChecked(False)
         self.lowCutToggleButton.clicked.connect(self.toggleLowCut)
-        apply_shadow(self.lowCutToggleButton)  # Apply shadow effect
+        widgetShadow(self.lowCutToggleButton)  # Apply shadow effect
         lowcutLayout.addWidget(self.lowCutToggleButton, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(lowcutLayout)
 
@@ -298,7 +298,7 @@ class AudioPilotUI(QWidget):
         self.eqTypeDropdown = QComboBox()
         self.eqTypeDropdown.addItems(["LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"])
         self.eqTypeDropdown.currentIndexChanged.connect(self.changeEQMode)  # Connect the signal to the handler
-        apply_shadow(self.eqTypeDropdown)  # Apply shadow effect
+        widgetShadow(self.eqTypeDropdown)  # Apply shadow effect
         eqTypeLayout.addWidget(self.eqTypeDropdown, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(eqTypeLayout)
 
@@ -308,11 +308,11 @@ class AudioPilotUI(QWidget):
         self.pitchToggle.setCheckable(True)
         self.pitchToggle.setChecked(False)
         self.pitchToggle.clicked.connect(self.togglePitchCorrection)
-        apply_shadow(self.pitchToggle)  # Apply shadow effect
+        widgetShadow(self.pitchToggle)  # Apply shadow effect
         pitchLayout.addWidget(self.pitchToggle, alignment=Qt.AlignmentFlag.AlignCenter)
         self.pitchTypeSelector = QComboBox()
         self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
-        apply_shadow(self.pitchTypeSelector)  # Apply shadow effect
+        widgetShadow(self.pitchTypeSelector)  # Apply shadow effect
         pitchLayout.addWidget(self.pitchTypeSelector, alignment=Qt.AlignmentFlag.AlignCenter)
         eqControls.addLayout(pitchLayout)
 
@@ -331,10 +331,10 @@ class AudioPilotUI(QWidget):
             self.bandButtons.addButton(btn, index + 1)
             bandSelectionLayout.addWidget(btn)
         self.bandButtons.buttonClicked.connect(self.changeBand)
-        apply_shadow(self.bandButtons.button(1))  # Apply shadow effect to the first band button
-        apply_shadow(self.bandButtons.button(2))  # Apply shadow effect to the second band button
-        apply_shadow(self.bandButtons.button(3))  # Apply shadow effect to the third band button
-        apply_shadow(self.bandButtons.button(4)) # Apply shadow effect to the fourth band button
+        widgetShadow(self.bandButtons.button(1))  # Apply shadow effect to the first band button
+        widgetShadow(self.bandButtons.button(2))  # Apply shadow effect to the second band button
+        widgetShadow(self.bandButtons.button(3))  # Apply shadow effect to the third band button
+        widgetShadow(self.bandButtons.button(4)) # Apply shadow effect to the fourth band button
         eqControlsLayout.addLayout(bandSelectionLayout)
 
         dialsLayout = QHBoxLayout()
@@ -347,7 +347,7 @@ class AudioPilotUI(QWidget):
         self.freqDial.setValue(1000)
         self.freqDial.setFixedSize(80, 80)
         self.freqDial.valueChanged.connect(self.changeFreq)
-        apply_shadow(self.freqDial)  # Apply shadow effect
+        widgetShadow(self.freqDial)  # Apply shadow effect
         freqLayout.addWidget(freqLabel)
         freqLayout.addWidget(self.freqDial)
         dialsLayout.addLayout(freqLayout)
@@ -360,7 +360,7 @@ class AudioPilotUI(QWidget):
         self.qDial.setValue(5)
         self.qDial.setFixedSize(80, 80)
         self.qDial.valueChanged.connect(self.changeQ)
-        apply_shadow(self.qDial)  # Apply shadow effect
+        widgetShadow(self.qDial)  # Apply shadow effect
         qLayout.addWidget(qLabel)
         qLayout.addWidget(self.qDial)
         dialsLayout.addLayout(qLayout)
@@ -373,7 +373,7 @@ class AudioPilotUI(QWidget):
         self.smallGainDial.setValue(0)
         self.smallGainDial.setFixedSize(80, 80)
         self.smallGainDial.valueChanged.connect(self.changeEqGain)
-        apply_shadow(self.smallGainDial)  # Apply shadow effect
+        widgetShadow(self.smallGainDial)  # Apply shadow effect
         smallGainLayout.addWidget(smallGainLabel)
         smallGainLayout.addWidget(self.smallGainDial)
         dialsLayout.addLayout(smallGainLayout)
@@ -384,9 +384,9 @@ class AudioPilotUI(QWidget):
         self.setLayout(self.mainLayout)
 
         # Set the default band button to be checked and update its style
-        default_band_button = self.bandButtons.button(self.selectedBand)
-        if default_band_button:
-            default_band_button.setChecked(True)
+        defaultBandButton = self.bandButtons.button(self.selectedBand)
+        if defaultBandButton:
+            defaultBandButton.setChecked(True)
 
         self.setLayout(self.mainLayout)
         self.setWindowTitle('Audio Pilot')
@@ -403,14 +403,14 @@ class AudioPilotUI(QWidget):
             print("Channel number is not set.")
             return
         
-        eq_mode_id = index  # Since the index corresponds to the enum value 0..5
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/type', [eq_mode_id])
-        print(f'Sent OSC message: /ch/{channel_num_formatted}/eq/{self.selectedBand}/type {eq_mode_id}')
+        eqModeId = index  # Since the index corresponds to the enum value 0..5
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/eq/{self.selectedBand}/type', [eqModeId])
+        print(f'Sent OSC message: /ch/{channelNumFormatted}/eq/{self.selectedBand}/type {eqModeId}')
 
     def toggleFineMode(self):
-        is_fine = self.fineButton.isChecked()
-        self.fader.setFineMode(is_fine)
+        isFine = self.fineButton.isChecked()
+        self.fader.setFineMode(isFine)
 
     def togglePlotUpdates(self):
         if self.rtaToggle.isChecked() and self.plotMgr is not None:
@@ -436,7 +436,7 @@ class AudioPilotUI(QWidget):
             self.selectChannelButton.setText(self.channelSelectorDialog.selectedChannel)
             self.channelNum = int(self.channelSelectorDialog.selectedChannel.split()[1]) - 1
             self.client.send_message('/-action/setrtasrc', [self.channelNum])
-            self.fader.channel_num = self.channelNum  # Set channel number for fader
+            self.fader.channelNumber = self.channelNum  # Set channel number for fader
             self.startPlotting()
 
     def startPlotting(self):
@@ -456,14 +456,13 @@ class AudioPilotUI(QWidget):
 
     def toggleMute(self):
         if self.channelNum is not None:  # Ensure channelNum is set
-            channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+            channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
             if self.toggleMuteButton.isChecked():
-                self.client.send_message(f'/ch/{channel_num_formatted}/mix/on', 0)
-                print(f"Channel {channel_num_formatted} is muted.")
+                self.client.send_message(f'/ch/{channelNumFormatted}/mix/on', 0)
+                print(f"Channel {channelNumFormatted} is muted.")
             else:
-                self.client.send_message(f'/ch/{channel_num_formatted}/mix/on', 1)
-                print(f"Channel {channel_num_formatted} is unmuted.")
-
+                self.client.send_message(f'/ch/{channelNumFormatted}/mix/on', 1)
+                print(f"Channel {channelNumFormatted} is unmuted.")
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
@@ -492,68 +491,68 @@ class AudioPilotUI(QWidget):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
-        closest_value = min(eqGainValues.keys(), key=lambda k: abs(k - value))
-        gain_id = eqGainValues[closest_value]
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/g', [gain_id])
+        closestGainValue = min(eqGainValues.keys(), key=lambda k: abs(k - value))
+        oscGainID = eqGainValues[closestGainValue]
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/eq/{self.selectedBand}/g', [oscGainID])
 
     def changeLowCut(self, value):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
-        closest_value = min(lowcutFreq.keys(), key=lambda k: abs(k - value))
-        lowcut_freq_id = lowcutFreq[closest_value]
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpf', [lowcut_freq_id])
+        closeestFreqValue = min(lowcutFreq.keys(), key=lambda k: abs(k - value))
+        oscFreqID = lowcutFreq[closeestFreqValue]
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/preamp/hpf', [oscFreqID])
 
     def changeFreq(self, value):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
-        def convert_freq_to_float(freq):
+        def freqToFloat(freq):
             return float(freq)
 
-        freq_keys = [convert_freq_to_float(k) for k in eqFreq.keys()]
-        closest_value = min(freq_keys, key=lambda k: abs(k - value))
+        floatFrequencies = [freqToFloat(k) for k in eqFreq.keys()]
+        closestFreq = min(floatFrequencies, key=lambda k: abs(k - value))
         # Find the closest key in its original string format
-        closest_key = min(eqFreq.keys(), key=lambda k: abs(float(k) - closest_value))
-        freq_id = eqFreq[closest_key]
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/f', [freq_id])
+        closestFreqKey = min(eqFreq.keys(), key=lambda k: abs(float(k) - closestFreq))
+        oscFrequencyID = eqFreq[closestFreqKey]
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/eq/{self.selectedBand}/f', [oscFrequencyID])
 
     def changeQ(self, value):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
-        closest_value = min(qValues.keys(), key=lambda k: abs(k - value))
-        q_value_id = qValues[closest_value]
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/eq/{self.selectedBand}/q', [q_value_id])
+        closestValue = min(qValues.keys(), key=lambda k: abs(k - value))
+        oscQID = qValues[closestValue]
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/eq/{self.selectedBand}/q', [oscQID])
 
     def changeTrim(self, value):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
-        closest_value = min(trimValues.keys(), key=lambda k: abs(k - value))
-        trim_id = trimValues[closest_value]
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/trim', [trim_id])
+        closestValue = min(trimValues.keys(), key=lambda k: abs(k - value))
+        oscTrimID = trimValues[closestValue]
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/preamp/trim', [oscTrimID])
 
     def toggleEQ(self):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
         state = 1 if self.eqToggleButton.isChecked() else 0
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/eq/on/', [state])
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/eq/on/', [state])
 
     def toggleLowCut(self):
         if self.channelNum is None:
             print("Channel number is not set.")
             return
         state = 1 if self.lowCutToggleButton.isChecked() else 0
-        channel_num_formatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
-        self.client.send_message(f'/ch/{channel_num_formatted}/preamp/hpon', [state])
+        channelNumFormatted = f"{self.channelNum + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelNumFormatted}/preamp/hpon', [state])
 
     def applyBlurEffect(self):
         blur = QGraphicsBlurEffect()
@@ -569,11 +568,11 @@ class AudioPilotUI(QWidget):
 
     def disconnect(self):
         from PyQt6.QtWidgets import QApplication
-        from main import center_widget
+        from main import alignWidgetCenter
         self.stopPlotting()
         self.applyBlurEffect()  # Apply blur effect before showing MixerDiscoveryUI
         self.mixerDiscovery = MixerDiscoveryUI(self)  # Pass self as parent to keep it modal
-        center_widget(self.mixerDiscovery, self)
+        alignWidgetCenter(self.mixerDiscovery, self)
         self.mixerDiscovery.exec()
         if self.mixerDiscovery.result() == QDialog.DialogCode.Accepted:
             self.mixerName = self.mixerDiscovery.selectedMixerName
@@ -591,13 +590,13 @@ class ChannelSelectorDialog(QDialog):
     def initUI(self):
         self.loadStylesheet("styles.qss")
         layout = QGridLayout()
-        self.button_group = QButtonGroup(self)
+        self.channelButtonGroup = QButtonGroup(self)
 
         for i in range(1, 33):
             btn = QPushButton(f"CH {i:02}")
             btn.setCheckable(True)
             btn.clicked.connect(self.chooseChannel)
-            self.button_group.addButton(btn, i)
+            self.channelButtonGroup.addButton(btn, i)
             layout.addWidget(btn, (i-1)//8, (i-1)%8)
 
         self.setLayout(layout)
@@ -607,7 +606,7 @@ class ChannelSelectorDialog(QDialog):
             self.setStyleSheet(f.read())
 
     def chooseChannel(self):
-        selectedButton = self.button_group.checkedButton()
+        selectedButton = self.channelButtonGroup.checkedButton()
         if selectedButton:
             self.selectedChannel = selectedButton.text()
             self.accept()

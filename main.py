@@ -16,11 +16,11 @@ from utils import ApplicationManager
 myappid = 'mycompany.myproduct.subproduct.version'
 windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
-def center_widget(widget, parent):
+def alignWidgetCenter(widget, parent):
     rect = parent.geometry()
-    widget_rect = widget.geometry()
-    widget_rect.moveCenter(rect.center())
-    widget.setGeometry(widget_rect)
+    widgetCenter = widget.geometry()
+    widgetCenter.moveCenter(rect.center())
+    widget.setGeometry(widgetCenter)
 
 class OSCServerThread(QThread):
     serverStarted = pyqtSignal()
@@ -41,30 +41,30 @@ if __name__ == "__main__":
         app.setStyleSheet(f.read())
 
     # Path to your logo image
-    LOGO_PATH = "AudioPilot_Logo2.png"
+    logoPath = "AudioPilot_Logo2.png"
 
     # Create a QIcon with multiple sizes
-    app_icon = QIcon()
+    applicationIcon = QIcon()
     for size in [16, 24, 32, 48, 256]:
-        pixmap = QPixmap(LOGO_PATH)
+        pixmap = QPixmap(logoPath)
         scaled = pixmap.scaled(size, size)
-        app_icon.addPixmap(scaled)
+        applicationIcon.addPixmap(scaled)
 
-    app.setWindowIcon(app_icon)  # Set the application icon globally
+    app.setWindowIcon(applicationIcon)  # Set the application icon globally
 
     # Initialize AudioPilotUI but don't show it yet
-    audio_pilot_ui = AudioPilotUI("", None)
-    audio_pilot_ui.applyBlurEffect()
-    audio_pilot_ui.show()
+    audioPilotUI = AudioPilotUI("", None)
+    audioPilotUI.applyBlurEffect()
+    audioPilotUI.show()
 
     mixerDiscoveryDialog = MixerDiscoveryUI()
-    mixerDiscoveryDialog.setParent(audio_pilot_ui, Qt.WindowType.Dialog)
+    mixerDiscoveryDialog.setParent(audioPilotUI, Qt.WindowType.Dialog)
     mixerDiscoveryDialog.setModal(True)
-    center_widget(mixerDiscoveryDialog, audio_pilot_ui)
+    alignWidgetCenter(mixerDiscoveryDialog, audioPilotUI)
 
     # Show mixer discovery dialog first
     if mixerDiscoveryDialog.exec() == QDialog.DialogCode.Accepted:
-        audio_pilot_ui.close()
+        audioPilotUI.close()
         chosenIP = mixerDiscoveryDialog.selectedMixerIp
         chosenName = mixerDiscoveryDialog.selectedMixerName
         client = SimpleUDPClient(chosenIP, 10023)
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         client._sock = server.socket
 
         # Update AudioPilotUI with the selected mixer details
-        apUI = audio_pilot_ui
+        apUI = audioPilotUI
         apUI.mixerName = chosenName
         apUI.client = client
         apUI.updateUI()  # Update the UI with the new mixer settings
@@ -96,5 +96,5 @@ if __name__ == "__main__":
         appManager = ApplicationManager(client, server, chosenName)
         appManager.run()
     else:
-        audio_pilot_ui.close()
+        audioPilotUI.close()
         sys.exit(app.exec())
