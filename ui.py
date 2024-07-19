@@ -18,6 +18,13 @@ logging.basicConfig(level=logging.DEBUG)
 
 logoPath = "AudioPilot_Logo2.png"
 
+def rPath(relativePath):
+    import sys
+    import os
+    """ Get the absolute path to a resource, works for dev and PyInstaller """
+    basePath = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(basePath, relativePath)
+
 def widgetShadow(widget, shadowRadius=15, xOffset=3, yOffset=3, color=QColor(0, 0, 0, 160)):
     shadow = QGraphicsDropShadowEffect()
     shadow.setBlurRadius(shadowRadius)
@@ -49,7 +56,7 @@ class MixerDiscoveryUI(QDialog):
         self.mixerWorker.start()
 
     def initUI(self):
-        self.loadStylesheet("styles.qss")
+        self.loadStylesheet(rPath("styles.qss"))
         self.layout = QVBoxLayout()
         self.infoLabel = QLabel("Searching for mixers...")
         self.infoLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -187,7 +194,7 @@ class AudioPilotUI(QWidget):
         self.setWindowTitle('Audio Pilot')
         self.setWindowIcon(QIcon(logoPath))
         self.setGeometry(100, 100, 1366, 768)  # Adjust the initial window size
-        self.loadStylesheet("styles.qss")
+        self.loadStylesheet(rPath("styles.qss"))
 
         self.mainLayout = QVBoxLayout()
 
@@ -588,7 +595,7 @@ class ChannelSelectorDialog(QDialog):
         self.initUI()
 
     def initUI(self):
-        self.loadStylesheet("styles.qss")
+        self.loadStylesheet(rPath("styles.qss"))
         layout = QGridLayout()
         self.channelButtonGroup = QButtonGroup(self)
 

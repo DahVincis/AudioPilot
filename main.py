@@ -1,4 +1,5 @@
 import sys
+import os
 import argparse
 from PyQt6.QtWidgets import QApplication, QDialog
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
@@ -22,6 +23,11 @@ def alignWidgetCenter(widget, parent):
     widgetCenter.moveCenter(rect.center())
     widget.setGeometry(widgetCenter)
 
+def rPath(relativePath):
+    """ Get the absolute path to a resource, works for dev and PyInstaller """
+    basePath = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(basePath, relativePath)
+
 class OSCServerThread(QThread):
     serverStarted = pyqtSignal()
     
@@ -37,11 +43,12 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Load QSS stylesheet
-    with open("styles.qss", "r") as f:
+    qssFilePath = rPath("styles.qss")
+    with open(qssFilePath, "r") as f:
         app.setStyleSheet(f.read())
 
     # Path to your logo image
-    logoPath = "AudioPilot_Logo2.png"
+    logoPath = rPath("AudioPilot_Logo2.png")
 
     # Create a QIcon with multiple sizes
     applicationIcon = QIcon()
