@@ -193,7 +193,7 @@ class AudioPilotUI(QWidget):
     def initUI(self):
         self.setWindowTitle('Audio Pilot')
         self.setWindowIcon(QIcon(logoPath))
-        self.setGeometry(100, 100, 1366, 768)  # Adjust the initial window size
+        self.setGeometry(100, 100, 1280, 720)  # Adjust the initial window size
         self.loadStylesheet(rPath("styles.qss"))
 
         self.mainLayout = QVBoxLayout()

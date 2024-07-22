@@ -10,7 +10,7 @@ a = Analysis(
         ('AudioPilot_Logo2.png', '.'),
         ('styles.qss', '.')
     ] + collect_data_files('.'),
-    hiddenimports=[],
+    hiddenimports=['Data', 'osc_handlers', 'ui', 'utils'],  # Ensure all modules are included
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -33,6 +33,7 @@ exe = EXE(
     upx=True,
     console=False,  # Hide the console window
     icon='AudioPilot_Logo2.ico',
+    splash='AudioPilot_Logo3.png',  # Set the splash screen
 )
 
 coll = COLLECT(

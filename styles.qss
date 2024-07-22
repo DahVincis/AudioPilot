@@ -9,42 +9,46 @@ QWidget {
 
 /* Button Styles */
 QPushButton {
-    background-color: #02217c; /* Your custom background color */
+    background-color: #02217c; /* Custom background color */
     border: 1px solid #cb4c00;
     border-radius: 4px; /* Equivalent to .5rem */
-    color: #D3D3D3; /* Your custom text color */
+    color: #D3D3D3; /* Custom text color */
     font-family: "Verdana, Helvetica, sans-serif";
     font-size: 14px; /* Equivalent to .875rem */
     font-weight: 600;
-    padding: 4px 8px; /* Smaller padding for disconnect button */
+    padding: 8px 16px; /* Uniform padding for buttons */
     text-align: center;
-    /* Adding shadow effect */
     margin: 2px; /* Add margin to simulate shadow */
 }
 
+QPushButton:checked {
+    background-color: #cb4c00; /* Custom selected background color */
+    border: 1px solid #395abd;
+    margin: 0;
+}
+
 QPushButton:hover {
-    background-color: #395abd; /* Your custom hover background color */
+    background-color: #395abd; /* Custom hover background color */
 }
 
 QPushButton:focus {
     outline: rgba(0,0,0,0.1);
 }
 
-QPushButton:checked {
-    background-color: #cb4c00; /* Your custom selected background color */
-    border: 1px solid #395abd;
-    /* Remove shadow effect */
-    margin: 0;
+/* Disconnect Button Specific Styles */
+#disconnectButton {
+    padding: 2px 6px; /* Smaller padding for disconnect button */
+    font-size: 12px; /* Smaller font size for disconnect button */
 }
 
-/* Specific styling for the Mute button when checked */
+/* Mute Button Specific Styles */
 #muteButton:checked {
     background-color: #A40606; /* Red color when mute is checked */
 }
 
 /* Dropdown Styles */
 QComboBox {
-    background-color: #02217c; /* Your custom background color */
+    background-color: #02217c; /* Custom background color */
     border: 1px solid #cb4c00;
     border-radius: 4px;
     color: #D3D3D3;
@@ -56,7 +60,7 @@ QComboBox {
 }
 
 QComboBox QAbstractItemView {
-    background-color: #02217c; /* Your custom dropdown background color */
+    background-color: #02217c; /* Custom dropdown background color */
     color: #D3D3D3;
 }
 
