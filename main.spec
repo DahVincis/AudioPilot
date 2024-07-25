@@ -8,9 +8,18 @@ a = Analysis(
     datas=[
         ('AudioPilot_Logo2.ico', '.'),
         ('AudioPilot_Logo2.png', '.'),
-        ('styles.qss', '.')
-    ] + collect_data_files('.'),
-    hiddenimports=['Data', 'osc_handlers', 'ui', 'utils'],  # Ensure all modules are included
+        ('styles.qss', '.'),
+        ('AudioPilot_Logo3.png', '.')  # Ensure the splash screen file is included
+    ],
+    hiddenimports=[
+        'Data',
+        'osc_handlers',
+        'ui',
+        'utils',
+        'pyqtgraph',  # Include any other hidden imports necessary
+        'pythonosc',
+        'numpy'
+    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -19,7 +28,12 @@ a = Analysis(
     cipher=None,
     noarchive=False,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+
+pyz = PYZ(
+    a.pure, 
+    a.zipped_data, 
+    cipher=None
+)
 
 exe = EXE(
     pyz,
