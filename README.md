@@ -1,48 +1,157 @@
 # AudioPilot
 
-## Overview
+AudioPilot is a PyQt6-based application designed to control audio mixing consoles. It utilizes the Python OSC library for real-time communication with the mixer, provides a graphical user interface for controlling various audio parameters, and dynamically adjusts Parametric equalization for a single channel.
 
-AudioPilot offers a sophisticated interface for managing Behringer digital audio mixers via network communications, harnessing the capabilities of the Open Sound Control (OSC) protocol. This Python application stands out for its automated discovery of mixers within a network, providing seamless integration and accessibility for sound engineers. A cornerstone of AudioPilot is its dynamic equalization system, which intelligently processes real-time audio data to automatically adjust equalizer settings, achieving optimal sound quality across different environments and performances. This is achieved through advanced analysis of the audio spectrum, with real-time adjustments to frequency bands based on predefined parameters and live audio input. Additionally, AudioPilot presents an intuitive visual representation of frequency responses, granting users immediate insight into the sonic characteristics of their audio, facilitating informed decision-making for live mixing scenarios. With these tools, AudioPilot empowers users to fine-tune their audio outputs, ensuring clarity and balance, and provides a high level of control over mixer parameters, streamlining the audio management process for both live and studio settings.
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Project Structure](#project-structure)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
-- **Mixer Discovery**: Automatically detects mixers within specified subnets.
-- **Keep-Alive**: Sends periodic messages to keep the mixer awake.
-- **Real-Time Audio Data Subscription and Renewal**: Manages RTA data subscriptions.
-- **dB Value Processing**: Converts mixer data points to decibel values.
-- **Dynamic EQ Control**: Adjusts EQ parameters based on RTA data and pre-set profiles for different vocal types.
-- **Visualization**: Plots real-time frequency response histograms using PyQtGraph.
-- **PyQt6 GUI**: Modern and user-friendly interface for managing mixers and visualizing audio data.
-- **OSC Handlers**: Robust handling of OSC messages for seamless communication with mixers.
-
-## Usage
-
-1. Run `main.py` to begin the mixer discovery process.
-2. Select a discovered mixer to interact with.
-3. Choose the vocal type that corresponds to your scenario.
-4. Observe the real-time frequency response in the visualization window.
-5. Use the provided GUI to interact with mixer settings and visualize audio data.
-
-For advanced usage, refer to the detailed comments within the code.
-
-## Requirements
-
-- Python 3.x
-- `python-osc`
-- `pyqtgraph`
-- `PyQt6`
-- Networked digital audio mixer compatible with OSC protocol (X32 or M32 Consoles)
+- Real-time audio mixer control via OSC
+- Graphical User Interface using PyQt6
+- Responsive RTA (Real-Time Analyzer) display
+- EQ and filter adjustments
+- Channel selection and control
+- Audio pitch correction options
 
 ## Installation
 
-To install AudioPilot, simply clone the repository and install the required Python packages.
+### Prerequisites
+
+Ensure you have Python 3.7 or higher installed. You can download Python from [python.org](https://www.python.org/downloads/).
+
+### Clone the Repository
 
 ```bash
-git clone https://github.com/DahVincis/AudioPilot.git
-cd audiopilot
+git clone https://github.com/DahVincis/AudioPilot
+cd AudioPilot
+```
+
+### Install Dependencies
+
+Create and activate a virtual environment (Optional):
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+```
+
+Install the required packages:
+
+```bash
 pip install -r requirements.txt
 ```
 
-## Authors
+### Packaging the Application
 
-- Pedro H. Fernandes
+This project uses PyInstaller to package the application into a standalone executable. If you have already packaged the project, you should find the executable in the `dist` directory.
+
+To package the application yourself, run:
+
+```bash
+pyinstaller main.spec
+```
+
+This will generate a standalone executable in the `dist/AudioPilot` directory.
+
+## Usage
+
+To run the application, simply execute the generated `AudioPilot.exe` file found in the `dist/AudioPilot` directory.
+
+If you are running the application from source, use:
+
+```bash
+python main.py
+```
+
+### GUI Overview
+
+- **Mute/Fine**: Toggle mute and fine adjustments.
+- **Channel**: Select the audio channel to control.
+- **EQ Controls**: Adjust the frequency, quality, and gain for different EQ bands.
+- **Pitch Correction**: Select and apply pitch correction.
+
+## Project Structure
+
+```plaintext
+AudioPilot/
+│
+├── build/
+├── dist/
+│   └── AudioPilot/
+│       ├── _internal/
+│       └── AudioPilot.exe
+├── __pycache__/
+├── AudioPilot_Logo2.ico
+├── AudioPilot_Logo2.png
+├── AudioPilot_Logo3.png
+├── Data.py
+├── main.py
+├── main.spec
+├── osc_handlers.py
+├── README.md
+├── requirements.txt
+├── styles.qss
+├── ui.py
+└── utils.py
+```
+
+- `build/`: Directory generated by PyInstaller during the build process.
+- `dist/`: Directory containing the packaged executable and related files.
+- `__pycache__/`: Directory for Python bytecode files.
+- `AudioPilot_Logo2.ico`: Icon file for the application.
+- `AudioPilot_Logo2.png`: Logo used within the application.
+- `AudioPilot_Logo3.png`: Splash screen image.
+- `Data.py`: Contains data used for audio processing.
+- `main.py`: Entry point of the application.
+- `main.spec`: Specification file for PyInstaller.
+- `osc_handlers.py`: Handles OSC communication and processing.
+- `requirements.txt`: List of dependencies.
+- `styles.qss`: Stylesheet for the PyQt6 application.
+- `ui.py`: User interface components and logic.
+- `utils.py`: Utility functions and classes.
+
+## Development
+
+### Setting Up the Development Environment
+
+1. Clone the repository.
+2. Install dependencies as mentioned in the [Installation](#installation) section.
+3. Run the application using `python main.py`.
+
+### Code Structure
+
+- `main.py`: Initializes and starts the application, setting up the main GUI and OSC communication.
+- `ui.py`: Defines the GUI layout and interactions using PyQt6.
+- `osc_handlers.py`: Contains handlers for OSC messages and processes incoming data.
+- `utils.py`: Provides utility classes and functions for the application.
+- `styles.qss`: Contains the QSS stylesheet for the application's appearance.
+
+### Logging
+
+The application uses the `logging` module to log important events and errors. Logs are printed to the console.
+
+## Contributing
+
+Contributions are welcome! Please follow these steps to contribute:
+
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature/YourFeature`).
+3. Commit your changes (`git commit -am 'Add YourFeature'`).
+4. Push to the branch (`git push origin feature/YourFeature`).
+5. Create a new Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+This README should provide a comprehensive guide to understanding, installing, using, and contributing to the AudioPilot project. Make sure to adjust any specific paths or instructions as needed for your environment.

@@ -7,10 +7,10 @@ a = Analysis(
     binaries=[],
     datas=[
         ('AudioPilot_Logo2.ico', '.'),
-        ('AudioPilot_Logo2.png', '.'),
+        ('AudioPilot_Logo3.png', '.'),
         ('styles.qss', '.')
     ] + collect_data_files('.'),
-    hiddenimports=['Data', 'osc_handlers', 'ui', 'utils'],  # Ensure all modules are included
+    hiddenimports=['Data', 'osc_handlers', 'ui', 'utils'],  # AudioPilot modules
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
