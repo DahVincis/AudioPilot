@@ -153,5 +153,3 @@ Contributions are welcome! Please follow these steps to contribute:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
-This README should provide a comprehensive guide to understanding, installing, using, and contributing to the AudioPilot project. Make sure to adjust any specific paths or instructions as needed for your environment.
