@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
     QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QButtonGroup, 
-    QGraphicsBlurEffect, QGraphicsDropShadowEffect
+    QGraphicsBlurEffect, QGraphicsDropShadowEffect, QSizePolicy, QSpacerItem
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QThread, QSize
 from PyQt6.QtGui import QPainter, QColor, QIcon, QPixmap
@@ -258,26 +258,6 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.rtaToggle)  # Apply shadow effect
         eqControls.addWidget(self.rtaToggle)
 
-        # Low Cut Control
-        lowcutLayout = QVBoxLayout()
-        self.lowCutToggleButton = QPushButton("Low Cut")
-        self.lowCutToggleButton.setCheckable(True)
-        self.lowCutToggleButton.setChecked(False)
-        self.lowCutToggleButton.clicked.connect(self.toggleLowCut)
-        widgetShadow(self.lowCutToggleButton)  # Apply shadow effect
-        lowcutLayout.addWidget(self.lowCutToggleButton, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        lowcutLabel = QLabel("Low Cut")
-        lowcutLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lowcutLayout.addWidget(lowcutLabel, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.lowcutDial = QDial()
-        self.lowcutDial.setRange(int(min(lowcutFreq.keys())), int(max(lowcutFreq.keys())))
-        self.lowcutDial.setValue(100)
-        self.lowcutDial.valueChanged.connect(self.changeLowCut)
-        widgetShadow(self.lowcutDial)  # Apply shadow effect
-        lowcutLayout.addWidget(self.lowcutDial, alignment=Qt.AlignmentFlag.AlignCenter)
-        eqControls.addLayout(lowcutLayout)
-
         # Trim Control
         trimLayout = QVBoxLayout()
         trimLabel = QLabel("Trim")
@@ -313,8 +293,10 @@ class AudioPilotUI(QWidget):
 
         bandSelectionLayout = QHBoxLayout()
         bandSelectionLayout.setSpacing(2)
-        bandSelectionLayout.addStretch(1)   # Add stretch to the left side
 
+        bandSelectionLayout.addStretch(4)  # Add stretch to the left side
+
+        # Band buttons
         self.bandButtons = QButtonGroup(self)
         bands = ["Low", "LoMid", "HiMid", "High"]
         for index, band in enumerate(bands):
@@ -327,7 +309,9 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.bandButtons.button(1))  # Apply shadow effect to the first band button
         widgetShadow(self.bandButtons.button(2))  # Apply shadow effect to the second band button
         widgetShadow(self.bandButtons.button(3))  # Apply shadow effect to the third band button
-        widgetShadow(self.bandButtons.button(4)) # Apply shadow effect to the fourth band button
+        widgetShadow(self.bandButtons.button(4))  # Apply shadow effect to the fourth band button
+
+        bandSelectionLayout.addStretch(1)  # Add stretch after the band buttons
 
         # Add EQ Mode Control and EQ Toggle next to Band Buttons
         self.eqTypeDropdown = QComboBox()
@@ -348,8 +332,30 @@ class AudioPilotUI(QWidget):
 
         dialsLayout = QHBoxLayout()
         dialsLayout.setSpacing(5)
-        dialsLayout.addStretch(1) # Add stretch to the left side
 
+        # Low Cut Control (add this layout before band buttons)
+        lowcutLayout = QVBoxLayout()
+
+        self.lowCutToggleButton = QPushButton("Low Cut")
+        self.lowCutToggleButton.setCheckable(True)
+        self.lowCutToggleButton.setChecked(False)
+        self.lowCutToggleButton.clicked.connect(self.toggleLowCut)
+        widgetShadow(self.lowCutToggleButton)  # Apply shadow effect
+        lowcutLayout.addWidget(self.lowCutToggleButton, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+
+        self.lowcutDial = QDial()
+        self.lowcutDial.setRange(int(min(lowcutFreq.keys())), int(max(lowcutFreq.keys())))
+        self.lowcutDial.setValue(100)
+        self.lowcutDial.setFixedSize(80, 80)  # Decrease size of the lowcut dial
+        self.lowcutDial.valueChanged.connect(self.changeLowCut)
+        widgetShadow(self.lowcutDial)  # Apply shadow effect
+        lowcutLayout.addWidget(self.lowcutDial, alignment=Qt.AlignmentFlag.AlignCenter)
+        dialsLayout.addStretch(1) # Add stretch to the right of the lowcut dial
+
+        dialsLayout.addLayout(lowcutLayout)
+
+        dialsLayout.addStretch(1) # Add stretch to the left side
         freqLayout = QVBoxLayout()
         freqLabel = QLabel("Frequency")
         freqLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -389,7 +395,7 @@ class AudioPilotUI(QWidget):
         smallGainLayout.addWidget(self.smallGainDial)
         dialsLayout.addLayout(smallGainLayout)
 
-        dialsLayout.addStretch(1) # Add stretch to the right side
+        dialsLayout.addStretch(2) # Add stretch to the right side
 
         eqControlsLayout.addLayout(dialsLayout)
         self.mainLayout.addLayout(eqControlsLayout)
@@ -403,7 +409,6 @@ class AudioPilotUI(QWidget):
 
         self.setLayout(self.mainLayout)
         self.setWindowTitle('Audio Pilot')
-
 
     def loadStylesheet(self, stylesheet):
         with open(stylesheet, "r") as f:
