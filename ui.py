@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton,
-    QWidget, QHBoxLayout, QSlider, QComboBox, QDial, QButtonGroup, 
-    QGraphicsBlurEffect, QGraphicsDropShadowEffect, QSizePolicy, QSpacerItem
+    QWidget, QHBoxLayout, QSlider, QDial, QButtonGroup,
+    QGraphicsBlurEffect, QGraphicsDropShadowEffect, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QThread, QSize
 from PyQt6.QtGui import QPainter, QColor, QIcon, QPixmap
@@ -204,7 +204,7 @@ class AudioPilotUI(QWidget):
         # Disconnect button
         self.disconnectButton = QPushButton("Disconnect")
         self.disconnectButton.setObjectName("disconnectButton")  # Set the object name
-        self.disconnectButton.setFixedSize(80, 28)  # Smaller size for disconnect button
+        self.disconnectButton.setFixedSize(90, 30)  # Smaller size for disconnect button
         self.disconnectButton.clicked.connect(self.disconnect)
         widgetShadow(self.disconnectButton)  # Apply shadow effect
         headerLayout.addWidget(self.disconnectButton, alignment=Qt.AlignmentFlag.AlignTop)
@@ -216,6 +216,7 @@ class AudioPilotUI(QWidget):
 
         leftPanelLayout = QVBoxLayout()
 
+        # Mute Button
         self.toggleMuteButton = QPushButton("Mute")
         self.toggleMuteButton.setObjectName("muteButton")
         self.toggleMuteButton.setCheckable(True)
@@ -223,6 +224,7 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.toggleMuteButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.toggleMuteButton)
 
+        # Fine Mode Button
         self.fineButton = QPushButton("Fine")
         self.fineButton.setCheckable(True)
         self.fineButton.setChecked(False)
@@ -230,9 +232,11 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.fineButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.fineButton)
 
+        # Fader
         self.fader = CustomFader(self.client, self.channelNum, Qt.Orientation.Vertical)
         leftPanelLayout.addWidget(self.fader)
 
+        # Channel Selector
         self.selectChannelButton = QPushButton("Channel")
         self.selectChannelButton.clicked.connect(self.showChannelSelector)
         widgetShadow(self.selectChannelButton)  # Apply shadow effect
@@ -240,6 +244,7 @@ class AudioPilotUI(QWidget):
 
         topLayout.addLayout(leftPanelLayout)
 
+        # RTA Plot
         self.graphWidget = pg.GraphicsLayoutWidget(show=True)
         self.plot = self.graphWidget.addPlot(title="")
         self.plot.setLogMode(x=True, y=False)
@@ -251,12 +256,41 @@ class AudioPilotUI(QWidget):
 
         eqControls = QVBoxLayout()
 
+        # RTA Control
         self.rtaToggle = QPushButton("RTA")
         self.rtaToggle.setCheckable(True)
         self.rtaToggle.setChecked(False)
         self.rtaToggle.clicked.connect(self.togglePlotUpdates)
         widgetShadow(self.rtaToggle)  # Apply shadow effect
         eqControls.addWidget(self.rtaToggle)
+
+        # AudioPilot Control
+        pitchLayout = QVBoxLayout()
+        pitchLayout.addStretch(1)
+        self.pitchToggle = QPushButton("AudioPilot")
+        self.pitchToggle.setCheckable(True)
+        self.pitchToggle.setChecked(False)
+        self.pitchToggle.clicked.connect(self.togglePitchCorrection)
+        widgetShadow(self.pitchToggle)  # Apply shadow effect
+        pitchLayout.addWidget(self.pitchToggle, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        pitchLayout.setSpacing(2)
+
+        # Pitch Type Selector
+        self.pitchButtonGroup = QButtonGroup(self)
+        self.pitchButtonGroup.setExclusive(True)
+        pitchTypes = ["Low Pitch", "Mid Pitch", "High Pitch"]
+        for pitch in pitchTypes:
+            btn = QPushButton(pitch)
+            btn.setCheckable(True)
+            btn.setFixedSize(105, 40)
+            btn.setStyleSheet("font-size: 12px;")
+            self.pitchButtonGroup.addButton(btn)
+            pitchLayout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
+            widgetShadow(btn)  # Apply shadow effect
+        eqControls.addLayout(pitchLayout)
+
+        pitchLayout.addStretch(1)  # Add stretch after the pitch type selector
 
         # Trim Control
         trimLayout = QVBoxLayout()
@@ -269,21 +303,9 @@ class AudioPilotUI(QWidget):
         self.trimDial.valueChanged.connect(self.changeTrim)
         widgetShadow(self.trimDial)  # Apply shadow effect
         trimLayout.addWidget(self.trimDial, alignment=Qt.AlignmentFlag.AlignCenter)
-        eqControls.addLayout(trimLayout)
 
-        # AudioPilot Control
-        pitchLayout = QVBoxLayout()
-        self.pitchToggle = QPushButton("AudioPilot")
-        self.pitchToggle.setCheckable(True)
-        self.pitchToggle.setChecked(False)
-        self.pitchToggle.clicked.connect(self.togglePitchCorrection)
-        widgetShadow(self.pitchToggle)  # Apply shadow effect
-        pitchLayout.addWidget(self.pitchToggle, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.pitchTypeSelector = QComboBox()
-        self.pitchTypeSelector.addItems(["Low Pitch", "Mid Pitch", "High Pitch"])
-        widgetShadow(self.pitchTypeSelector)  # Apply shadow effect
-        pitchLayout.addWidget(self.pitchTypeSelector, alignment=Qt.AlignmentFlag.AlignCenter)
-        eqControls.addLayout(pitchLayout)
+        trimLayout.addStretch(1)  # Add stretch after the trim dial
+        eqControls.addLayout(trimLayout)
 
         topLayout.addLayout(eqControls)
         self.mainLayout.addLayout(topLayout)
@@ -294,7 +316,7 @@ class AudioPilotUI(QWidget):
         bandSelectionLayout = QHBoxLayout()
         bandSelectionLayout.setSpacing(2)
 
-        bandSelectionLayout.addStretch(4)  # Add stretch to the left side
+        bandSelectionLayout.addStretch(6)  # Add stretch to the left side
 
         # Band buttons
         self.bandButtons = QButtonGroup(self)
@@ -320,6 +342,7 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.eqTypeDropdown)  # Apply shadow effect
         bandSelectionLayout.addWidget(self.eqTypeDropdown)
 
+        # EQ Button
         self.eqToggleButton = QPushButton("EQ")
         self.eqToggleButton.setCheckable(True)
         self.eqToggleButton.setChecked(False)
@@ -327,13 +350,13 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.eqToggleButton)  # Apply shadow effect
         bandSelectionLayout.addWidget(self.eqToggleButton)
 
-        bandSelectionLayout.addStretch(1)  # Add stretch to the right side
+        bandSelectionLayout.addStretch(2)  # Add stretch to the right side
         eqControlsLayout.addLayout(bandSelectionLayout)
 
         dialsLayout = QHBoxLayout()
         dialsLayout.setSpacing(5)
 
-        # Low Cut Control (add this layout before band buttons)
+        # Low Cut Control 
         lowcutLayout = QVBoxLayout()
 
         self.lowCutToggleButton = QPushButton("Low Cut")
@@ -343,7 +366,7 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.lowCutToggleButton)  # Apply shadow effect
         lowcutLayout.addWidget(self.lowCutToggleButton, alignment=Qt.AlignmentFlag.AlignCenter)
         
-
+        # Low Cut Dial
         self.lowcutDial = QDial()
         self.lowcutDial.setRange(int(min(lowcutFreq.keys())), int(max(lowcutFreq.keys())))
         self.lowcutDial.setValue(100)
@@ -356,6 +379,8 @@ class AudioPilotUI(QWidget):
         dialsLayout.addLayout(lowcutLayout)
 
         dialsLayout.addStretch(1) # Add stretch to the left side
+
+        # Frequency Control
         freqLayout = QVBoxLayout()
         freqLabel = QLabel("Frequency")
         freqLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -369,6 +394,7 @@ class AudioPilotUI(QWidget):
         freqLayout.addWidget(self.freqDial)
         dialsLayout.addLayout(freqLayout)
 
+        # Quality Control
         qLayout = QVBoxLayout()
         qLabel = QLabel("Quality")
         qLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -382,6 +408,7 @@ class AudioPilotUI(QWidget):
         qLayout.addWidget(self.qDial)
         dialsLayout.addLayout(qLayout)
 
+        # Gain Control
         smallGainLayout = QVBoxLayout()
         smallGainLabel = QLabel("Gain")
         smallGainLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -413,7 +440,7 @@ class AudioPilotUI(QWidget):
     def loadStylesheet(self, stylesheet):
         with open(stylesheet, "r") as f:
             self.setStyleSheet(f.read())
-
+    
     def changeBand(self, button):
         self.selectedBand = self.bandButtons.id(button)
 
@@ -485,8 +512,10 @@ class AudioPilotUI(QWidget):
 
     def togglePitchCorrection(self):
         if self.pitchToggle.isChecked():
-            vocalType = self.pitchTypeSelector.currentText()
-            self.startBandManager(vocalType)
+            checkedButton = self.pitchButtonGroup.checkedButton()
+            if checkedButton:
+                vocalType = checkedButton.text()
+                self.startBandManager(vocalType)
         else:
             self.stopBandManager()
 
