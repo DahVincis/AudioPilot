@@ -220,6 +220,7 @@ class AudioPilotUI(QWidget):
         self.toggleMuteButton = QPushButton("Mute")
         self.toggleMuteButton.setObjectName("muteButton")
         self.toggleMuteButton.setCheckable(True)
+        self.toggleMuteButton.setChecked(True)  # Set to checked initially
         self.toggleMuteButton.clicked.connect(self.toggleMute)
         widgetShadow(self.toggleMuteButton)  # Apply shadow effect
         leftPanelLayout.addWidget(self.toggleMuteButton)
@@ -278,7 +279,6 @@ class AudioPilotUI(QWidget):
 
         # Pitch Type Selector
         self.pitchButtonGroup = QButtonGroup(self)
-        self.pitchButtonGroup.setExclusive(True)
         pitchTypes = ["Low Pitch", "Mid Pitch", "High Pitch"]
         for pitch in pitchTypes:
             btn = QPushButton(pitch)
@@ -288,6 +288,11 @@ class AudioPilotUI(QWidget):
             self.pitchButtonGroup.addButton(btn)
             pitchLayout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
             widgetShadow(btn)  # Apply shadow effect
+
+        # Set the default pitch button to be checked and update its style
+        defaultPitchButton = self.pitchButtonGroup.buttons()[0]  # Set the first pitch as default
+        if defaultPitchButton:
+            defaultPitchButton.setChecked(True)
         eqControls.addLayout(pitchLayout)
 
         pitchLayout.addStretch(1)  # Add stretch after the pitch type selector
@@ -309,7 +314,6 @@ class AudioPilotUI(QWidget):
 
         topLayout.addLayout(eqControls)
         self.mainLayout.addLayout(topLayout)
-
 
         eqControlsLayout = QVBoxLayout()
 
@@ -433,6 +437,7 @@ class AudioPilotUI(QWidget):
         defaultBandButton = self.bandButtons.button(self.selectedBand)
         if defaultBandButton:
             defaultBandButton.setChecked(True)
+            self.changeBand(defaultBandButton)  # Ensure the changeBand function is called
 
         self.setLayout(self.mainLayout)
         self.setWindowTitle('Audio Pilot')
