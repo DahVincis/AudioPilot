@@ -18,11 +18,12 @@ a = Analysis(
         'utils',
         'pyqtgraph',
         'pythonosc',
-        'numpy'
+        'numpy',
+        'PyQt6',
     ],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=['PyQt5', 'PyQt4'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
@@ -46,7 +47,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,  # Hide the console window
-    icon='AudioPilot_Logo2.ico', # Set the icon for the app
+    icon='AudioPilot_Logo2.ico',  # Set the icon for the app
     splash='AudioPilot_Logo3.png',  # Set the splash screen
 )
 
