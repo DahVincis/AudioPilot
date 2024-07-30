@@ -1,0 +1,105 @@
+/* General Styles */
+QWidget {
+    background-color: #191714;
+    color: #D3D3D3;
+    font-family: "Verdana, Helvetica, sans-serif";
+    font-size: 14px;
+    font-weight: 565;
+}
+
+/* Button Styles */
+QPushButton {
+    background-color: #02217c; /* Custom background color */
+    border: 1px solid #cb4c00;
+    border-radius: 4px; /* Equivalent to .5rem */
+    color: #D3D3D3; /* Custom text color */
+    font-family: "Verdana, Helvetica, sans-serif";
+    font-size: 14px; /* Equivalent to .875rem */
+    font-weight: 600;
+    padding: 8px 16px; /* Uniform padding for buttons */
+    text-align: center;
+    margin: 2px; /* Add margin to simulate shadow */
+}
+
+QPushButton:checked {
+    background-color: #cb4c00; /* Custom selected background color */
+    border: 2px solid #395abd;
+    margin: 0;
+}
+
+QPushButton:hover {
+    background-color: #395abd; /* Custom hover background color */
+}
+
+QPushButton:focus {
+    outline: rgba(0,0,0,0.1);
+}
+
+/* Disconnect Button Specific Styles */
+#disconnectButton {
+    padding: 2px 6px; /* Smaller padding for disconnect button */
+    font-size: 12px; /* Smaller font size for disconnect button */
+}
+
+/* Mute Button Specific Styles */
+#muteButton:checked {
+    background-color: #A40606; /* Red color when mute is checked */
+}
+
+/* Dropdown Styles */
+QComboBox {
+    background-color: #02217c; /* Custom background color */
+    border: 1px solid #cb4c00;
+    border-radius: 4px;
+    color: #D3D3D3;
+    font-family: "Verdana, Helvetica, sans-serif";
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 8px;
+    text-align: center;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #02217c; /* Custom dropdown background color */
+    color: #D3D3D3;
+}
+
+/* Dial Styles */
+QDial {
+    background-color: #af480d; /* Background color of the dial */
+    border: 1px solid #02217c;
+    border-radius: 8px;
+}
+
+QDial::groove {
+    background: #D3D3D3; /* Groove color */
+    border-radius: 6px;
+}
+
+QDial::handle {
+    background: #cb4c00; /* Handle color */
+    border: 1px solid #02217c;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+}
+
+/* Slider (Fader) Styles */
+QSlider::groove:vertical {
+    border: 1px solid #cb4c00;
+    background: #02217c;
+    width: 2px;
+    border-radius: 3px;
+}
+
+QSlider::handle:vertical {
+    background: #af480d; /* Handle color */
+    border: 1px solid #02217c;
+    height: 50px;
+    margin: -5px; /* Center handle */
+    border-radius: 10px;
+}
+
+QSlider::add-page:vertical, QSlider::sub-page:vertical {
+    background: #a8beff; /* Slider fill color */
+}

@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QSlider, QDial, QButtonGroup,
     QGraphicsBlurEffect, QGraphicsDropShadowEffect, QComboBox
 )
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QThread, QSize
+from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QThread, QSize, QRect
 from PyQt6.QtGui import QPainter, QColor, QIcon, QPixmap
 import pyqtgraph as pg
 import threading
@@ -115,13 +115,26 @@ class CustomFader(QSlider):
         self.channelNumber = channelNumber
         self.scaleFactor = 100  # Scale factor to convert float to int
         self.precisionLevel = 1.5  # Default precision factor
-        self.adjustedKeys = [key.replace('‐', '-') for key in faderData.keys()]
-        self.minVal = min(map(lambda x: int(float(x) * self.scaleFactor), self.adjustedKeys))
-        self.maxVal = max(map(lambda x: int(float(x) * self.scaleFactor), self.adjustedKeys))
+        self.adjustedKeys = [float(key) for key in faderData.keys()]
+        self.minVal = min(map(lambda x: int(x * self.scaleFactor), self.adjustedKeys))
+        self.maxVal = max(map(lambda x: int(x * self.scaleFactor), self.adjustedKeys))
         self.setRange(self.minVal, self.maxVal)
         self.setValue(0)
         self.valueChanged.connect(self.sendOscMessage)
-        self.tickInterval = (self.maximum() - self.minimum()) / 10
+
+        # Define the specific ticks to display
+        self.displayTicks = {
+            10: 1.0,
+            5: 0.8759,
+            0: 0.7517,
+            -5: 0.6256,
+            -10: 0.5005,
+            -20: 0.3754,
+            -30: 0.2502,
+            -50: 0.1251,
+            -70: 0.0411,
+            -90: 0.0
+        }
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -133,26 +146,26 @@ class CustomFader(QSlider):
         rect = self.rect()
         interval = (rect.height() - 20) / (self.maximum() - self.minimum())
 
-        # Define the positions and values for the labels we want to show
-        positionTicks = [10, 5, 0, -10, -20, -40, -60, -70, -90]
-        scaledTicks = [int(tick * self.scaleFactor) for tick in positionTicks]
-        for tick in scaledTicks:
+        for key, value in self.displayTicks.items():
+            tick = int(key * self.scaleFactor)
             y = rect.height() - ((tick - self.minimum()) * interval) - 9
-            painter.drawLine(30, int(y), rect.width(), int(y))  # Adjusted the line position
-            painter.drawText(-1, int(y) + 5, str(tick / self.scaleFactor))  # Adjusted the label position
+            painter.drawLine(rect.width() // 2 - 20, int(y), rect.width() // 2 + 20, int(y))  # Bigger tick lines
+
+            textRect = QRect(5, int(y) - 7, 40, 15)  # Define the text rectangle to be left of the fader
+            painter.drawText(textRect, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignCenter, str(key))
 
         painter.end()
 
     def sizeHint(self):
-        return QSize(120, 220)  # Increase width to ensure labels fit
+        return QSize(130, 160)  # Increase width to ensure labels fit
 
     def setFineMode(self, isFine):
         self.precisionLevel = 0.7 if isFine else 1.5
 
     def sendOscMessage(self):
         scaledDbValue = self.value() / self.scaleFactor
-        updatedKeys = {key.replace('‐', '-'): value for key, value in faderData.items()}
-        oscFloatID = updatedKeys.get(str(scaledDbValue), None)
+        closestKey = min(self.adjustedKeys, key=lambda x: abs(x - scaledDbValue))
+        oscFloatID = faderData.get(str(closestKey), None)
         if oscFloatID is not None and self.channelNumber is not None:
             channelNumberFormatted = f"{self.channelNumber+1:02}"  # Format channel_num as two-digit
             self.client.send_message(f'/ch/{channelNumberFormatted}/mix/fader', [oscFloatID])
@@ -264,6 +277,7 @@ class AudioPilotUI(QWidget):
         self.rtaToggle.clicked.connect(self.togglePlotUpdates)
         widgetShadow(self.rtaToggle)  # Apply shadow effect
         eqControls.addWidget(self.rtaToggle)
+        eqControls.addStretch(1)  # Add stretch before the EQ controls
 
         # AudioPilot Control
         pitchLayout = QVBoxLayout()
@@ -275,7 +289,7 @@ class AudioPilotUI(QWidget):
         widgetShadow(self.pitchToggle)  # Apply shadow effect
         pitchLayout.addWidget(self.pitchToggle, alignment=Qt.AlignmentFlag.AlignCenter)
         
-        pitchLayout.setSpacing(2)
+        pitchLayout.addStretch(1)  # Add stretch before the pitch type selector
 
         # Pitch Type Selector
         self.pitchButtonGroup = QButtonGroup(self)
@@ -295,7 +309,7 @@ class AudioPilotUI(QWidget):
             defaultPitchButton.setChecked(True)
         eqControls.addLayout(pitchLayout)
 
-        pitchLayout.addStretch(1)  # Add stretch after the pitch type selector
+        eqControls.addStretch(2)  # Add stretch after the pitch type selector
 
         # Trim Control
         trimLayout = QVBoxLayout()
@@ -303,13 +317,13 @@ class AudioPilotUI(QWidget):
         trimLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         trimLayout.addWidget(trimLabel, alignment=Qt.AlignmentFlag.AlignCenter)
         self.trimDial = QDial()
+        self.trimDial.setFixedSize(100, 100)
         self.trimDial.setRange(int(min(trimValues.keys())), int(max(trimValues.keys())))
         self.trimDial.setValue(0)
         self.trimDial.valueChanged.connect(self.changeTrim)
         widgetShadow(self.trimDial)  # Apply shadow effect
         trimLayout.addWidget(self.trimDial, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        trimLayout.addStretch(1)  # Add stretch after the trim dial
         eqControls.addLayout(trimLayout)
 
         topLayout.addLayout(eqControls)
@@ -341,6 +355,7 @@ class AudioPilotUI(QWidget):
 
         # Add EQ Mode Control and EQ Toggle next to Band Buttons
         self.eqTypeDropdown = QComboBox()
+        self.eqTypeDropdown.setFixedSize(80, 36)
         self.eqTypeDropdown.addItems(["LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"])
         self.eqTypeDropdown.currentIndexChanged.connect(self.changeEQMode)  # Connect the signal to the handler
         widgetShadow(self.eqTypeDropdown)  # Apply shadow effect
@@ -350,6 +365,7 @@ class AudioPilotUI(QWidget):
         self.eqToggleButton = QPushButton("EQ")
         self.eqToggleButton.setCheckable(True)
         self.eqToggleButton.setChecked(False)
+        self.eqToggleButton.setFixedSize(80, 40)
         self.eqToggleButton.clicked.connect(self.toggleEQ)
         widgetShadow(self.eqToggleButton)  # Apply shadow effect
         bandSelectionLayout.addWidget(self.eqToggleButton)
@@ -358,12 +374,14 @@ class AudioPilotUI(QWidget):
         eqControlsLayout.addLayout(bandSelectionLayout)
 
         dialsLayout = QHBoxLayout()
-        dialsLayout.setSpacing(5)
+        dialsLayout.addStretch(2)  # Add stretch to the left side
 
         # Low Cut Control 
         lowcutLayout = QVBoxLayout()
-
+        lowcutLayout.addStretch(1)  # Add stretch to the top
         self.lowCutToggleButton = QPushButton("Low Cut")
+        self.lowCutToggleButton.setFixedSize(83, 30)
+        self.lowCutToggleButton.setStyleSheet("font-size: 11px;")
         self.lowCutToggleButton.setCheckable(True)
         self.lowCutToggleButton.setChecked(False)
         self.lowCutToggleButton.clicked.connect(self.toggleLowCut)
@@ -378,14 +396,12 @@ class AudioPilotUI(QWidget):
         self.lowcutDial.valueChanged.connect(self.changeLowCut)
         widgetShadow(self.lowcutDial)  # Apply shadow effect
         lowcutLayout.addWidget(self.lowcutDial, alignment=Qt.AlignmentFlag.AlignCenter)
-        dialsLayout.addStretch(1) # Add stretch to the right of the lowcut dial
-
         dialsLayout.addLayout(lowcutLayout)
-
-        dialsLayout.addStretch(1) # Add stretch to the left side
+        dialsLayout.addStretch(1)  # Add stretch to the middle
 
         # Frequency Control
         freqLayout = QVBoxLayout()
+        freqLayout.addStretch(1)  # Add stretch to the top
         freqLabel = QLabel("Frequency")
         freqLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.freqDial = QDial()
@@ -400,6 +416,7 @@ class AudioPilotUI(QWidget):
 
         # Quality Control
         qLayout = QVBoxLayout()
+        qLayout.addStretch(1)  # Add stretch to the top
         qLabel = QLabel("Quality")
         qLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.qDial = QDial()
@@ -414,6 +431,7 @@ class AudioPilotUI(QWidget):
 
         # Gain Control
         smallGainLayout = QVBoxLayout()
+        smallGainLayout.addStretch(1)  # Add stretch to the top
         smallGainLabel = QLabel("Gain")
         smallGainLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.smallGainDial = QDial()
@@ -426,7 +444,7 @@ class AudioPilotUI(QWidget):
         smallGainLayout.addWidget(self.smallGainDial)
         dialsLayout.addLayout(smallGainLayout)
 
-        dialsLayout.addStretch(2) # Add stretch to the right side
+        dialsLayout.addStretch(3) # Add stretch to the right side
 
         eqControlsLayout.addLayout(dialsLayout)
         self.mainLayout.addLayout(eqControlsLayout)
