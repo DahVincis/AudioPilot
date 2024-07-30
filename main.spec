@@ -9,14 +9,14 @@ a = Analysis(
         ('AudioPilot_Logo2.ico', '.'),
         ('AudioPilot_Logo2.png', '.'),
         ('styles.qss', '.'),
-        ('AudioPilot_Logo3.png', '.')  # Ensure the splash screen file is included
+        ('AudioPilot_Logo3.png', '.')
     ],
     hiddenimports=[
         'Data',
         'osc_handlers',
         'ui',
         'utils',
-        'pyqtgraph',  # Include any other hidden imports necessary
+        'pyqtgraph',
         'pythonosc',
         'numpy'
     ],
@@ -46,7 +46,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,  # Hide the console window
-    icon='AudioPilot_Logo2.ico',
+    icon='AudioPilot_Logo2.ico', # Set the icon for the app
     splash='AudioPilot_Logo3.png',  # Set the splash screen
 )
 
