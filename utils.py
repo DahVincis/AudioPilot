@@ -182,7 +182,7 @@ class BandManager:
         minDB = None
         for freq, dbValues in dataRTA.items():
             if lowBound <= freq <= upBound:
-                filteredDBValues = [db for db in dbValues if db > -70]
+                filteredDBValues = [db for db in dbValues if db > -60]
                 if filteredDBValues:
                     currentMinDB = min(filteredDBValues)
                     if minDB is None or currentMinDB < minDB:

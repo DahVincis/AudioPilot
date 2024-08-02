@@ -23,7 +23,7 @@ QPushButton {
 
 QPushButton:checked {
     background-color: #cb4c00; /* Custom selected background color */
-    border: 1px solid #395abd;
+    border: 2px solid #395abd;
     margin: 0;
 }
 

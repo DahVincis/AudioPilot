@@ -14,7 +14,7 @@ from osc_handlers import RTASubscriber, OscHandlers
 from utils import ApplicationManager
 
 # Explicit App User Model ID for Windows taskbar icon
-myappid = 'mycompany.myproduct.subproduct.version'
+myappid = 'AudioPilot.AudioPilot.App.2_5'
 windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 def alignWidgetCenter(widget, parent):
