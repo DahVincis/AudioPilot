@@ -9,6 +9,10 @@ import sys
 from pythonosc.udp_client import SimpleUDPClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import select
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 from Data import frequencies, dataRTA, bandsRangeRTA, bandRanges, qLimits, gainMultis, eqGainValues, qValues, queueRTA
 
@@ -242,12 +246,17 @@ class BandManager:
         return closestGain
 
     def sendOSCParameters(self, channel, eqBand, freqID, gainID, qIDValue):
-        self.client.send_message(f'/ch/{channel + 1}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
+        channelFormatted = f"{channel + 1:02}"  # Format channelNum as two-digit
+        self.client.send_message(f'/ch/{channelFormatted}/eq/{eqBand}', [2, freqID, gainID, qIDValue])
+        print(f"Sent OSC Parameters for channel {channelFormatted}, eqBand {eqBand}: freqID {freqID}, gainID {gainID}, qIDValue {qIDValue}")
+
 
     def updateAllBands(self, vocalType, channel):
+        logging.debug(f"Updating all bands for vocalType: {vocalType}, channel: {channel}")
         bands = ['Low', 'Low Mid', 'High Mid', 'High']
         for index, band in enumerate(bands):
             multiplier = gainMultis.get(vocalType, {}).get(band, 0)
+            logging.debug(f"Processing band: {band}, multiplier: {multiplier}")
             if multiplier > 0:
                 targetDB = self.findLowestDBinBand(band)
                 targetFreq = self.findLowestFreqinBand(band)
@@ -255,11 +264,11 @@ class BandManager:
                 targetDB = self.findHighestDBinBand(band)
                 targetFreq = self.findHighestFreqinBand(band)
             if targetDB is None or targetFreq is None:
-                print(f"No dB data or frequency data for band {band}. Skipping...")
+                logging.debug(f"No dB data or frequency data for band {band}. Skipping...")
                 continue
             freqID, actualFreq = self.findClosestFrequency(band, targetFreq)
             if freqID is None:
-                print(f"No closest frequency found for band {band}. Skipping...")
+                logging.debug(f"No closest frequency found for band {band}. Skipping...")
                 continue
             if multiplier > 0:
                 gainValue = self.calculateGainForLowestDB(targetDB, band, vocalType)
@@ -269,6 +278,8 @@ class BandManager:
             qValue = self.calculateQValue(targetFreq, band)
             qIDValue = self.getClosestQIDValue(qValue)
             self.sendOSCParameters(channel, index + 1, freqID, gainID, qIDValue)
+            logging.debug(f"Sent OSC Parameters for band {band}, channel {channel}: freqID {freqID}, gainID {gainID}, qIDValue {qIDValue}")
+
 
 class MixerDiscovery:
     def __init__(self, port=10023):

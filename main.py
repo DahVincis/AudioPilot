@@ -85,7 +85,7 @@ if __name__ == "__main__":
         subRTA = RTASubscriber(client)
         faderHandler = OscHandlers()
         dispatcher.map("/meters", subRTA.handlerRTA)
-        dispatcher.map("/fader", faderHandler.handlerFader)
+        #dispatcher.map("/fader", faderHandler.handlerFader)
 
         server = ThreadingOSCUDPServer((args.ip, args.port), dispatcher)
         print(f"Serving on {server.server_address}")
