@@ -534,29 +534,40 @@ class AudioPilotUI(QWidget):
                 print(f"Channel {channelNumFormatted} is unmuted.")
 
     def togglePitchCorrection(self):
+        logging.debug(f"togglePitchCorrection called. pitchToggle isChecked: {self.pitchToggle.isChecked()}")
         if self.pitchToggle.isChecked():
             checkedButton = self.pitchButtonGroup.checkedButton()
             if checkedButton:
                 vocalType = checkedButton.text()
+                logging.debug(f"Starting Band Manager with vocalType: {vocalType}")
                 self.startBandManager(vocalType)
         else:
+            logging.debug("Stopping Band Manager")
             self.stopBandManager()
+
 
     def startBandManager(self, vocalType):
         if self.channelNum is not None:
             self.bandThreadRunning.set()
             self.bandMgr = BandManager(self.client)
             self.bandManagerThread = threading.Thread(target=self.runBandManager, args=(vocalType, self.channelNum), daemon=True)
+            logging.debug(f"Starting band manager thread with vocalType: {vocalType}, channel: {self.channelNum}")
             self.bandManagerThread.start()
+        else:
+            logging.debug("Channel number is not set. Cannot start Band Manager.")
+
 
     def stopBandManager(self):
         if self.bandManagerThread is not None:
             self.bandThreadRunning.clear()
 
     def runBandManager(self, vocalType, channel):
+        logging.debug(f"Running Band Manager for vocalType: {vocalType}, channel: {channel}")
         while self.bandThreadRunning.is_set():
             self.bandMgr.updateAllBands(vocalType, channel)
+            logging.debug(f"Updated all bands for vocalType: {vocalType}, channel: {channel}")
             time.sleep(0.3)
+
 
     def changeEqGain(self, value):
         if self.channelNum is None:
